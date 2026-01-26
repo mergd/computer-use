@@ -1,0 +1,27 @@
+{
+  "name": "browser-mcp",
+  "version": "0.1.0",
+  "description": "Browser automation MCP server — accessibility tree, element interaction, and raw CDP via a Chrome extension relay.",
+  "type": "module",
+  "bin": {
+    "browser-mcp": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "bun src/cli.ts",
+    "build": "tsc",
+    "lint": "oxlint",
+    "format": "oxfmt ."
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
