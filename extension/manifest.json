@@ -29,7 +29,7 @@
    "manifest_version": 3,
    "name": "Computer Control",
    "options_page": "options.html",
-   "permissions": [ "storage", "activeTab", "scripting", "debugger", "tabGroups", "tabs", "alarms", "notifications", "system.display", "webNavigation", "declarativeNetRequestWithHostAccess", "nativeMessaging", "downloads", "cookies", "clipboardRead", "clipboardWrite", "history", "webRequest", "pageCapture" ],
+   "permissions": [ "storage", "activeTab", "scripting", "debugger", "tabGroups", "tabs", "alarms", "notifications", "system.display", "webNavigation", "declarativeNetRequestWithHostAccess", "nativeMessaging", "downloads", "cookies", "clipboardRead", "clipboardWrite", "history", "webRequest", "pageCapture", "offscreen" ],
    "version": "0.1.0",
    "web_accessible_resources": [ {
       "matches": [ "\u003Call_urls>" ],

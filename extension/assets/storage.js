@@ -57,20 +57,6 @@ export async function clearMcpStorage() {
 // =============================================================================
 // Stubs for unused react-core.js exports (MCP mode doesn't need these)
 // =============================================================================
-/** Tool permission types (enum stub) */
-export const ToolPermissionType = {
-    NAVIGATE: "navigate",
-    READ_PAGE_CONTENT: "read_page_content",
-    READ_CONSOLE_MESSAGES: "read_console_messages",
-    READ_NETWORK_REQUESTS: "read_network_requests",
-    CLICK: "click",
-    TYPE: "type",
-    UPLOAD_IMAGE: "upload_image",
-    DOMAIN_TRANSITION: "domain_transition",
-    PLAN_APPROVAL: "plan_approval",
-    EXECUTE_JAVASCRIPT: "execute_javascript",
-    REMOTE_MCP: "remote_mcp",
-};
 /** Get environment/API config - stub */
 export function getEnvironmentConfig() {
     return {
@@ -115,6 +101,20 @@ export class SavedPromptsService {
     static async updateAlarmForPrompt(_prompt) { }
     static async updateNextRunTimes() { }
 }
+/** Tool permission types (enum stub) - imported by mcp-tools.js */
+export const ToolPermissionType = {
+    NAVIGATE: "navigate",
+    READ_PAGE_CONTENT: "read_page_content",
+    READ_CONSOLE_MESSAGES: "read_console_messages",
+    READ_NETWORK_REQUESTS: "read_network_requests",
+    CLICK: "click",
+    TYPE: "type",
+    UPLOAD_IMAGE: "upload_image",
+    DOMAIN_TRANSITION: "domain_transition",
+    PLAN_APPROVAL: "plan_approval",
+    EXECUTE_JAVASCRIPT: "execute_javascript",
+    REMOTE_MCP: "remote_mcp",
+};
 /** Format user identity - stub */
 export function formatUserIdentity(_user) {
     return {};
@@ -128,7 +128,6 @@ export const AuthHelpers = {};
 export const SavedPromptsServiceInstance = new SavedPromptsService();
 export const OAuthConfig = {};
 export const Analytics = { track: () => { } };
-export function createElementRef() { return `ref_${Math.random().toString(36).slice(2, 8)}`; }
 export const extensionId = chrome?.runtime?.id || "unknown";
 // =============================================================================
 // Backwards compatibility exports (aliased to match react-core.js exports)
@@ -136,7 +135,6 @@ export const extensionId = chrome?.runtime?.id || "unknown";
 export { StorageKeys as S };
 export { setStorageValue as s };
 export { getStorageValue as g };
-export { ToolPermissionType as T };
 export { getEnvironmentConfig as h };
 export { generateScreenshotId as k };
 export { getOrCreateAnonymousId as d };
@@ -154,5 +152,5 @@ export { AuthHelpers as B };
 export { SavedPromptsServiceInstance as y };
 export { OAuthConfig as C };
 export { Analytics as E };
-// Note: _ is already exported as dynamicImport
+export { ToolPermissionType as T };
 export { extensionId as v };

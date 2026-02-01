@@ -2,14 +2,11 @@ import {
   s as setStorageValue,
   S as StorageKeys,
   h as getApiConfig,
-  o as openSidePanelFromTab,
   H as handleLogout,
   _ as dynamicImport,
   I as handleOAuthRedirect,
   b as SavedPromptsService,
 } from "./storage.js";
-
-const initializeExtension = () => {};
 
 import {
   L as notifyDisconnection,
@@ -21,7 +18,6 @@ import {
 
 // Native messaging connection state
 let nativePort = null;
-let connectedHostName = null;
 let isConnecting = false;
 let isNativeHostInstalled = false;
 let isMcpConnected = false;
@@ -132,7 +128,6 @@ async function connectToNativeHost() {
             if (connectionSuccessful) {
               // Store the successful connection
               nativePort = port;
-              connectedHostName = hostConfig.name;
               isNativeHostInstalled = true;
 
               // Set up message handler for incoming messages
@@ -144,7 +139,6 @@ async function connectToNativeHost() {
               nativePort.onDisconnect.addListener(() => {
                 const errorMessage = chrome.runtime.lastError?.message;
                 nativePort = null;
-                connectedHostName = null;
                 isMcpConnected = false;
                 setStorageValue(StorageKeys.MCP_CONNECTED, false);
                 handleNativeMessagingError(errorMessage);
@@ -187,7 +181,6 @@ async function disconnectNativeHost() {
     await chrome.permissions.remove({ permissions: ["nativeMessaging"] });
     nativePort?.disconnect();
     nativePort = null;
-    connectedHostName = null;
     isConnecting = false;
     isNativeHostInstalled = false;
     isMcpConnected = false;
@@ -259,8 +252,13 @@ async function handleToolRequest(request) {
       // Handle clipboard_read tool
       if (toolName === "clipboard_read") {
         try {
-          const text = await navigator.clipboard.readText();
-          sendToolResponse({ content: text }, clientId);
+          await ensureOffscreenDocument();
+          const response = await chrome.runtime.sendMessage({ type: "CLIPBOARD_READ" });
+          if (response?.success) {
+            sendToolResponse({ content: response.text }, clientId);
+          } else {
+            sendToolResponse(createErrorResponse(response?.error || "Failed to read clipboard"), clientId);
+          }
         } catch (err) {
           sendToolResponse(createErrorResponse(err.message), clientId);
         }
@@ -270,8 +268,16 @@ async function handleToolRequest(request) {
       // Handle clipboard_write tool
       if (toolName === "clipboard_write") {
         try {
-          await navigator.clipboard.writeText(params.args?.text || "");
-          sendToolResponse({ content: "Text copied to clipboard" }, clientId);
+          await ensureOffscreenDocument();
+          const response = await chrome.runtime.sendMessage({
+            type: "CLIPBOARD_WRITE",
+            text: params.args?.text || ""
+          });
+          if (response?.success) {
+            sendToolResponse({ content: "Text copied to clipboard" }, clientId);
+          } else {
+            sendToolResponse(createErrorResponse(response?.error || "Failed to write to clipboard"), clientId);
+          }
         } catch (err) {
           sendToolResponse(createErrorResponse(err.message), clientId);
         }
@@ -638,7 +644,6 @@ async function initializeScheduledPromptAlarms() {
 }
 
 // Initialize extension
-initializeExtension();
 connectToNativeHost();
 
 // Cache for main tab aliveness checks
@@ -983,6 +988,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Return true to indicate async response
   return true;
 });
+
+/**
+ * Ensure offscreen document exists for clipboard/audio operations
+ */
+let offscreenDocumentCreated = false;
+
+async function ensureOffscreenDocument() {
+  if (!chrome.offscreen) {
+    throw new Error("Offscreen API not available");
+  }
+
+  // Check if we already have an offscreen document
+  if (offscreenDocumentCreated) {
+    return;
+  }
+
+  try {
+    // Try to check if document already exists by querying contexts
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [chrome.runtime.getURL("offscreen.html")]
+    });
+
+    if (contexts.length > 0) {
+      offscreenDocumentCreated = true;
+      return;
+    }
+
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: [chrome.offscreen.Reason.CLIPBOARD],
+      justification: "Clipboard and audio operations require DOM access",
+    });
+    offscreenDocumentCreated = true;
+  } catch (error) {
+    // If error is because document already exists, that's fine
+    if (error.message?.includes("Only a single offscreen document")) {
+      offscreenDocumentCreated = true;
+      return;
+    }
+    throw error;
+  }
+}
 
 /**
  * Create offscreen document for audio playback

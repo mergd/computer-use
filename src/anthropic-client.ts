@@ -8,9 +8,25 @@ export interface AnthropicClientOptions {
   baseUrl?: string;
 }
 
+export interface TextContent {
+  type: "text";
+  text: string;
+}
+
+export interface ImageContent {
+  type: "image";
+  source: {
+    type: "base64";
+    media_type: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+    data: string;
+  };
+}
+
+export type ContentBlock = TextContent | ImageContent;
+
 export interface Message {
   role: "user" | "assistant";
-  content: string;
+  content: string | ContentBlock[];
 }
 
 export interface CreateMessageParams {
@@ -19,13 +35,8 @@ export interface CreateMessageParams {
   messages: Message[];
 }
 
-export interface ContentBlock {
-  type: "text";
-  text: string;
-}
-
 export interface MessageResponse {
-  content: ContentBlock[];
+  content: TextContent[];
   model: string;
   stop_reason: string;
 }
