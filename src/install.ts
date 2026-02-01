@@ -11,6 +11,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const HOST_NAME = "com.browsermcp.native_host";
 
+/** Chrome Web Store published extension ID */
+export const WEBSTORE_EXTENSION_ID = "kenhnnhgbbgkdbedfmijnllgpcognghl";
+
 export function extensionDir(): string {
   return path.resolve(__dirname, "../extension");
 }
@@ -86,12 +89,18 @@ export function install(extensionId: string): { manifestPath: string; hostPath: 
 
   const hostPath = writeHostBinary();
 
+  // Include both the provided ID and the Chrome Web Store ID
+  const allowedOrigins = [`chrome-extension://${extensionId}/`];
+  if (extensionId !== WEBSTORE_EXTENSION_ID) {
+    allowedOrigins.push(`chrome-extension://${WEBSTORE_EXTENSION_ID}/`);
+  }
+
   const manifest = {
     name: HOST_NAME,
-    description: "browser-mcp native host",
+    description: "Computer Control native messaging host",
     path: hostPath,
     type: "stdio",
-    allowed_origins: [`chrome-extension://${extensionId}/`],
+    allowed_origins: allowedOrigins,
   };
 
   const dir = nativeHostDir();
