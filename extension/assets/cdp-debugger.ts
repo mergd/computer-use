@@ -212,43 +212,72 @@ declare global {
 // =============================================================================
 
 // TabGroupManager reference (injected from mcp-tools.js)
-let K: TabGroupManager | null = null;
+let tabGroupManagerRef: TabGroupManager | null = null;
 
 /**
  * Set the TabGroupManager dependency
  * @param tabGroupManager - The TabGroupManager singleton (K from mcp-tools.js)
  */
 export function setTabGroupManager(tabGroupManager: TabGroupManager): void {
-  K = tabGroupManager;
+  tabGroupManagerRef = tabGroupManager;
 }
 
 // =============================================================================
 // Screenshot resize helper functions
 // =============================================================================
 
-function V(e: number, t: number): number {
-  return Math.floor((e - 1) / t) + 1;
+/**
+ * Calculate ceiling division: ceil(dividend / divisor)
+ * Used for token calculation in screenshot resizing
+ */
+function ceilingDivision(dividend: number, divisor: number): number {
+  return Math.floor((dividend - 1) / divisor) + 1;
 }
 
-function J(e: number, t: number, r: number): number {
-  return V(e, r) * V(t, r);
+/**
+ * Calculate the number of tokens for given image dimensions
+ * Tokens are calculated as ceil(width/pxPerToken) * ceil(height/pxPerToken)
+ */
+function calculateTokensForDimensions(width: number, height: number, pxPerToken: number): number {
+  return ceilingDivision(width, pxPerToken) * ceilingDivision(height, pxPerToken);
 }
 
-function X(e: number, t: number, r: ResizeParams): [number, number] {
-  const { pxPerToken: o, maxTargetPx: n, maxTargetTokens: i } = r;
-  if (e <= n && t <= n && J(e, t, o) <= i) return [e, t];
-  if (t > e) {
-    const [o, n] = X(t, e, r);
-    return [n, o];
+/**
+ * Calculate optimal target dimensions for screenshot resizing
+ * Uses binary search to find the largest dimensions that fit within token/pixel limits
+ */
+function calculateTargetDimensions(width: number, height: number, params: ResizeParams): [number, number] {
+  const { pxPerToken, maxTargetPx, maxTargetTokens } = params;
+
+  // If already within limits, return original dimensions
+  if (width <= maxTargetPx && height <= maxTargetPx && calculateTokensForDimensions(width, height, pxPerToken) <= maxTargetTokens) {
+    return [width, height];
   }
-  const a = e / t;
-  let s = e,
-    c = 1;
+
+  // Handle portrait orientation by swapping and recursing
+  if (height > width) {
+    const [targetHeight, targetWidth] = calculateTargetDimensions(height, width, params);
+    return [targetWidth, targetHeight];
+  }
+
+  const aspectRatio = width / height;
+  let maxWidth = width;
+  let minWidth = 1;
+
+  // Binary search for optimal width
   for (;;) {
-    if (c + 1 === s) return [c, Math.max(Math.round(c / a), 1)];
-    const e = Math.floor((c + s) / 2),
-      t = Math.max(Math.round(e / a), 1);
-    e <= n && J(e, t, o) <= i ? (c = e) : (s = e);
+    if (minWidth + 1 === maxWidth) {
+      return [minWidth, Math.max(Math.round(minWidth / aspectRatio), 1)];
+    }
+
+    const midWidth = Math.floor((minWidth + maxWidth) / 2);
+    const midHeight = Math.max(Math.round(midWidth / aspectRatio), 1);
+
+    if (midWidth <= maxTargetPx && calculateTokensForDimensions(midWidth, midHeight, pxPerToken) <= maxTargetTokens) {
+      minWidth = midWidth;
+    } else {
+      maxWidth = midWidth;
+    }
   }
 }
 
@@ -284,10 +313,10 @@ class ScreenshotContextClass {
   }
 }
 
-const Q = new ScreenshotContextClass();
+const screenshotContext = new ScreenshotContextClass();
 
-// Export ScreenshotContext for use in mcp-tools.js
-export { Q };
+// Export ScreenshotContext for use in mcp-tools.js (aliased as Q for backward compatibility)
+export { screenshotContext as Q };
 
 // =============================================================================
 // Global CDP state initialization
@@ -313,7 +342,7 @@ if (!globalThis.__cdpConsoleTrackingEnabled) {
 // Keyboard mappings - Mac-specific key commands
 // =============================================================================
 
-const Z: Record<string, string | string[]> = {
+const macKeyCommands: Record<string, string | string[]> = {
   backspace: "deleteBackward",
   enter: "insertNewline",
   numpadenter: "insertNewline",
@@ -466,7 +495,7 @@ const Z: Record<string, string | string[]> = {
   "shift+cmd+z": "redo",
 };
 
-const ee: Record<string, KeyDefinition> = {
+const keyDefinitions: Record<string, KeyDefinition> = {
   enter: { key: "Enter", code: "Enter", keyCode: 13, text: "\r" },
   return: { key: "Enter", code: "Enter", keyCode: 13, text: "\r" },
   kp_enter: {
@@ -585,7 +614,7 @@ const ee: Record<string, KeyDefinition> = {
 // =============================================================================
 // CDPDebugger class - Chrome DevTools Protocol debugger management
 // Handles console message capture and network request tracking
-// Singleton instance: re = new CDPDebugger()
+// Singleton instance: cdpDebuggerInstance = new CDPDebugger()
 // =============================================================================
 
 class CDPDebugger {
@@ -642,8 +671,8 @@ class CDPDebugger {
           type: args.type || "log",
           text:
             args.args
-              ?.map((e) =>
-                e.value !== undefined ? String(e.value) : e.description || ""
+              ?.map((arg) =>
+                arg.value !== undefined ? String(arg.value) : arg.description || ""
               )
               .join(" ") || "",
           timestamp: args.timestamp || Date.now(),
@@ -696,7 +725,7 @@ class CDPDebugger {
         const storage = CDPDebugger.networkRequestsByTab.get(tabId);
         if (storage) {
           const request = storage.requests.find(
-            (r) => r.requestId === args.requestId
+            (req) => req.requestId === args.requestId
           );
           if (request) {
             request.status = args.response.status;
@@ -709,7 +738,7 @@ class CDPDebugger {
         const storage = CDPDebugger.networkRequestsByTab.get(tabId);
         if (storage) {
           const request = storage.requests.find(
-            (r) => r.requestId === args.requestId
+            (req) => req.requestId === args.requestId
           );
           if (request) {
             request.status = 503;
@@ -888,8 +917,8 @@ class CDPDebugger {
     clickCount = 1,
     modifiers = 0
   ): Promise<void> {
-    if (K) {
-      await K.hideIndicatorForToolUse(tabId);
+    if (tabGroupManagerRef) {
+      await tabGroupManagerRef.hideIndicatorForToolUse(tabId);
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -913,14 +942,14 @@ class CDPDebugger {
       });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      for (let i = 1; i <= clickCount; i++) {
+      for (let clickIndex = 1; clickIndex <= clickCount; clickIndex++) {
         await this.dispatchMouseEvent(tabId, {
           type: "mousePressed",
           x,
           y,
           button,
           buttons,
-          clickCount: i,
+          clickCount: clickIndex,
           modifiers,
         });
         await new Promise((resolve) => setTimeout(resolve, 12));
@@ -931,15 +960,15 @@ class CDPDebugger {
           button,
           buttons: 0,
           modifiers,
-          clickCount: i,
+          clickCount: clickIndex,
         });
-        if (i < clickCount) {
+        if (clickIndex < clickCount) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
     } finally {
-      if (K) {
-        await K.restoreIndicatorAfterToolUse(tabId);
+      if (tabGroupManagerRef) {
+        await tabGroupManagerRef.restoreIndicatorAfterToolUse(tabId);
       }
     }
   }
@@ -1049,7 +1078,7 @@ class CDPDebugger {
 
     const commands: string[] = [];
     if (this.isMac) {
-      const macCommand = Z[chord.toLowerCase()];
+      const macCommand = macKeyCommands[chord.toLowerCase()];
       if (macCommand) {
         if (Array.isArray(macCommand)) {
           commands.push(...macCommand);
@@ -1086,7 +1115,7 @@ class CDPDebugger {
 
   getKeyCode(key: string): KeyDefinition | undefined {
     const lowerKey = key.toLowerCase();
-    const mapped = ee[lowerKey];
+    const mapped = keyDefinitions[lowerKey];
     if (mapped) return mapped;
 
     if (key.length === 1) {
@@ -1174,17 +1203,17 @@ class CDPDebugger {
 
     if (onlyErrors) {
       messages = messages.filter(
-        (m) => m.type === "error" || m.type === "exception"
+        (msg) => msg.type === "error" || msg.type === "exception"
       );
     }
 
     if (pattern) {
       try {
         const regex = new RegExp(pattern, "i");
-        messages = messages.filter((m) => regex.test(m.text));
+        messages = messages.filter((msg) => regex.test(msg.text));
       } catch {
-        messages = messages.filter((m) =>
-          m.text.toLowerCase().includes(pattern.toLowerCase())
+        messages = messages.filter((msg) =>
+          msg.text.toLowerCase().includes(pattern.toLowerCase())
         );
       }
     }
@@ -1252,7 +1281,7 @@ class CDPDebugger {
     let requests = storage.requests;
 
     if (urlPattern) {
-      requests = requests.filter((r) => r.url.includes(urlPattern));
+      requests = requests.filter((req) => req.url.includes(urlPattern));
     }
 
     return requests;
@@ -1272,8 +1301,8 @@ class CDPDebugger {
   ): Promise<ScreenshotResult> {
     const params = resizeParams || this.defaultResizeParams;
 
-    if (K) {
-      await K.hideIndicatorForToolUse(tabId);
+    if (tabGroupManagerRef) {
+      await tabGroupManagerRef.hideIndicatorForToolUse(tabId);
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -1354,7 +1383,7 @@ class CDPDebugger {
             ctx.drawImage(img, 0, 0);
           }
 
-          const [targetWidth, targetHeight] = X(width, height, params);
+          const [targetWidth, targetHeight] = calculateTargetDimensions(width, height, params);
 
           // If no resizing needed
           if (width === targetWidth && height === targetHeight) {
@@ -1413,11 +1442,11 @@ class CDPDebugger {
         img.src = dataUrl;
       });
 
-      Q.setContext(tabId, result);
+      screenshotContext.setContext(tabId, result);
       return result;
     } finally {
-      if (K) {
-        await K.restoreIndicatorAfterToolUse(tabId);
+      if (tabGroupManagerRef) {
+        await tabGroupManagerRef.restoreIndicatorAfterToolUse(tabId);
       }
     }
   }
@@ -1576,7 +1605,7 @@ class CDPDebugger {
     }
 
     const result = scriptResult[0].result as ScreenshotResult;
-    Q.setContext(tabId, result);
+    screenshotContext.setContext(tabId, result);
     return result;
   }
 }
@@ -1585,5 +1614,7 @@ class CDPDebugger {
 // Singleton instance export
 // =============================================================================
 
-const re = new CDPDebugger();
-export { re };
+const cdpDebuggerInstance = new CDPDebugger();
+
+// Export with backward-compatible alias
+export { cdpDebuggerInstance as re };

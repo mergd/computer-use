@@ -8,7 +8,7 @@
  * - Image utilities
  * - Domain utilities
  */
-import { k as generateScreenshotId } from "./storage.js";
+import { generateScreenshotId } from "./storage.js";
 // Alias for backward compatibility
 const generateId = generateScreenshotId;
 // =============================================================================
@@ -41,7 +41,7 @@ export function assertNotRestrictedTab(tab) {
 // Response Formatters
 // =============================================================================
 /**
- * Format available tabs for output (R)
+ * Format available tabs for output
  */
 export function formatTabsResponse(tabs, tabGroupId) {
     const result = {
@@ -57,7 +57,7 @@ export function formatTabsResponse(tabs, tabGroupId) {
     return JSON.stringify(result);
 }
 /**
- * Format tab context with optional skills (U)
+ * Format tab context with optional skills
  */
 export function formatTabContextResponse(context) {
     const result = {};
@@ -77,7 +77,7 @@ export function formatTabContextResponse(context) {
     return JSON.stringify(result);
 }
 /**
- * Strip system reminders from text (P)
+ * Strip system reminders from text
  */
 export function stripSystemReminders(text) {
     return text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "").trim();
@@ -86,11 +86,11 @@ export function stripSystemReminders(text) {
 // Tool Schema Helpers
 // =============================================================================
 /**
- * Convert tools to Anthropic schema format (G)
+ * Convert tools to Anthropic schema format
  */
 export const toAnthropicSchemas = async (tools, context) => await Promise.all(tools.map((tool) => tool.toAnthropicSchema(context)));
 /**
- * Coerce parameter types based on tool schema (B)
+ * Coerce parameter types based on tool schema
  */
 export const coerceParameterTypes = (toolName, params, tools) => {
     const tool = tools.find((t) => t.name === toolName);
@@ -114,7 +114,7 @@ export const coerceParameterTypes = (toolName, params, tools) => {
     return coerced;
 };
 /**
- * Parse array from string or return as-is (O)
+ * Parse array from string or return as-is
  */
 export const parseArrayParam = (value, _context) => {
     if (Array.isArray(value))
@@ -134,7 +134,7 @@ export const parseArrayParam = (value, _context) => {
 // Image Utilities
 // =============================================================================
 /**
- * Find image by ID in message history ($)
+ * Find image by ID in message history
  */
 export function findImageInMessages(messages, imageId) {
     console.info(`[imageUtils] Looking for image with ID: ${imageId}`);
@@ -202,7 +202,7 @@ export function findImageInMessages(messages, imageId) {
     return undefined;
 }
 /**
- * Extract width or height from dimension string (L - image dimension)
+ * Extract width or height from dimension string
  */
 export function extractImageDimension(text, dimension) {
     if (!text)
@@ -216,7 +216,7 @@ export function extractImageDimension(text, dimension) {
 // Domain Utilities
 // =============================================================================
 /**
- * Extract hostname from URL (N)
+ * Extract hostname from URL
  */
 export function extractHostname(url) {
     if (!url.startsWith("http")) {
@@ -230,7 +230,7 @@ export function extractHostname(url) {
     }
 }
 /**
- * Normalize domain for cache lookups (q)
+ * Normalize domain for cache lookups
  */
 export function normalizeDomain(url) {
     return url
@@ -239,7 +239,7 @@ export function normalizeDomain(url) {
         .replace(/\/.*$/, "");
 }
 /**
- * Check if navigation crossed domains during an action (F)
+ * Check if navigation crossed domains during an action
  */
 export async function checkNavigationInterception(tabId, originalUrl, actionName) {
     if (!originalUrl)
@@ -267,7 +267,3 @@ export async function checkNavigationInterception(tabId, originalUrl, actionName
 // =============================================================================
 // Re-export generateId for screenshot IDs
 export { generateId };
-// =============================================================================
-// Single-letter Aliases for Backward Compatibility
-// =============================================================================
-export { formatTabsResponse as R, formatTabContextResponse as U, stripSystemReminders as P, toAnthropicSchemas as G, coerceParameterTypes as B, parseArrayParam as O, findImageInMessages as $, extractImageDimension as L, extractHostname as N, normalizeDomain as q, checkNavigationInterception as F, };

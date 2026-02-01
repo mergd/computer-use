@@ -8,7 +8,7 @@
  * - ve: plan schema
  * - Ie: update_plan tool
  */
-import { T as ToolTypes } from "./storage.js";
+import { ToolPermissionType } from "./storage.js";
 import { DomainCategoryCache } from "./domain-cache.js";
 // =============================================================================
 // Plan Mode Helpers
@@ -156,7 +156,7 @@ export const updatePlanTool = {
         const domainCategories = await getDomainCategories(domains);
         const result = {
             type: "permission_required",
-            tool: ToolTypes.PLAN_APPROVAL,
+            tool: ToolPermissionType.PLAN_APPROVAL,
             url: "",
             toolUseId: context?.toolUseId,
             actionData: { plan: { domains: domainCategories, approach } },

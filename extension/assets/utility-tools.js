@@ -10,9 +10,9 @@
  * - shortcuts_list tool
  * - shortcuts_execute tool
  */
-import { re } from "./cdp-debugger.js";
-import { K } from "./tab-group-manager.js";
-import { T as ToolTypes, b as SavedPromptsService, s as setStorageValue, S as StorageKeys } from "./storage.js";
+import { re as cdpDebugger } from "./cdp-debugger.js";
+import { K as TabGroupManager } from "./tab-group-manager.js";
+import { ToolPermissionType, SavedPromptsService, setStorageValue, StorageKeys } from "./storage.js";
 import { findImageInMessages, checkNavigationInterception } from "./utils.js";
 // =============================================================================
 // Upload Image Tool
@@ -55,7 +55,7 @@ export const uploadImageTool = {
             }
             if (!context?.tabId)
                 throw new Error("No active tab found");
-            const effectiveTabId = await K.getEffectiveTabId(args.tabId, context.tabId);
+            const effectiveTabId = await TabGroupManager.getEffectiveTabId(args.tabId, context.tabId);
             const tab = await chrome.tabs.get(effectiveTabId);
             if (!tab.id)
                 throw new Error("Upload tab has no ID");
@@ -68,7 +68,7 @@ export const uploadImageTool = {
                 if (permResult.needsPrompt) {
                     return {
                         type: "permission_required",
-                        tool: ToolTypes.UPLOAD_IMAGE,
+                        tool: ToolPermissionType.UPLOAD_IMAGE,
                         url,
                         toolUseId,
                         actionData: {
@@ -234,7 +234,7 @@ export const uploadImageTool = {
             if (!results || results.length === 0) {
                 throw new Error("Failed to execute upload image");
             }
-            const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+            const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
             const scriptResult = results[0].result;
             // If script returned error, return as ToolResultError
             if (scriptResult.error) {
@@ -329,7 +329,7 @@ export const readConsoleMessagesTool = {
             const { tabId, onlyErrors = false, clear = false, pattern, limit = 100 } = params;
             if (!context?.tabId)
                 throw new Error("No active tab found");
-            const effectiveTabId = await K.getEffectiveTabId(tabId, context.tabId);
+            const effectiveTabId = await TabGroupManager.getEffectiveTabId(tabId, context.tabId);
             const tab = await chrome.tabs.get(effectiveTabId);
             if (!tab.id)
                 throw new Error("Active tab has no ID");
@@ -342,7 +342,7 @@ export const readConsoleMessagesTool = {
                 if (permResult.needsPrompt) {
                     return {
                         type: "permission_required",
-                        tool: ToolTypes.READ_CONSOLE_MESSAGES,
+                        tool: ToolPermissionType.READ_CONSOLE_MESSAGES,
                         url,
                         toolUseId,
                     };
@@ -350,22 +350,22 @@ export const readConsoleMessagesTool = {
                 return { error: "Permission denied for reading console messages on this domain" };
             }
             try {
-                await re.enableConsoleTracking(tab.id);
+                await cdpDebugger.enableConsoleTracking(tab.id);
             }
             catch {
                 // Ignore errors enabling console tracking
             }
-            const messages = re.getConsoleMessages(tab.id, onlyErrors, pattern);
+            const messages = cdpDebugger.getConsoleMessages(tab.id, onlyErrors, pattern);
             if (clear)
-                re.clearConsoleMessages(tab.id);
+                cdpDebugger.clearConsoleMessages(tab.id);
             if (messages.length === 0) {
                 return {
                     output: `No console ${onlyErrors ? "errors or exceptions" : "messages"} found for this tab.\n\nNote: Console tracking starts when this tool is first called. If the page loaded before calling this tool, you may need to refresh the page to capture console messages from page load.`,
                     tabContext: {
                         currentTabId: context.tabId,
                         executedOnTabId: effectiveTabId,
-                        availableTabs: await K.getValidTabsWithMetadata(context.tabId),
-                        tabCount: (await K.getValidTabsWithMetadata(context.tabId)).length,
+                        availableTabs: await TabGroupManager.getValidTabsWithMetadata(context.tabId),
+                        tabCount: (await TabGroupManager.getValidTabsWithMetadata(context.tabId)).length,
                     },
                 };
             }
@@ -386,7 +386,7 @@ export const readConsoleMessagesTool = {
             const msgType = onlyErrors ? "error/exception messages" : "console messages";
             const truncateNote = truncated ? ` (showing first ${limit} of ${messages.length})` : "";
             const header = `Found ${messages.length} ${msgType}${truncateNote}:`;
-            const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+            const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
             return {
                 output: `${header}\n\n${formatted}`,
                 tabContext: {
@@ -467,7 +467,7 @@ export const readNetworkRequestsTool = {
             const { tabId, urlPattern, clear = false, limit = 100 } = params;
             if (!context?.tabId)
                 throw new Error("No active tab found");
-            const effectiveTabId = await K.getEffectiveTabId(tabId, context.tabId);
+            const effectiveTabId = await TabGroupManager.getEffectiveTabId(tabId, context.tabId);
             const tab = await chrome.tabs.get(effectiveTabId);
             if (!tab.id)
                 throw new Error("Active tab has no ID");
@@ -480,7 +480,7 @@ export const readNetworkRequestsTool = {
                 if (permResult.needsPrompt) {
                     return {
                         type: "permission_required",
-                        tool: ToolTypes.READ_NETWORK_REQUESTS,
+                        tool: ToolPermissionType.READ_NETWORK_REQUESTS,
                         url,
                         toolUseId,
                     };
@@ -488,14 +488,14 @@ export const readNetworkRequestsTool = {
                 return { error: "Permission denied for reading network requests on this domain" };
             }
             try {
-                await re.enableNetworkTracking(tab.id);
+                await cdpDebugger.enableNetworkTracking(tab.id);
             }
             catch {
                 // Ignore errors enabling network tracking
             }
-            const requests = re.getNetworkRequests(tab.id, urlPattern);
+            const requests = cdpDebugger.getNetworkRequests(tab.id, urlPattern);
             if (clear)
-                re.clearNetworkRequests(tab.id);
+                cdpDebugger.clearNetworkRequests(tab.id);
             if (requests.length === 0) {
                 let reqType = "network requests";
                 if (urlPattern)
@@ -505,8 +505,8 @@ export const readNetworkRequestsTool = {
                     tabContext: {
                         currentTabId: context.tabId,
                         executedOnTabId: effectiveTabId,
-                        availableTabs: await K.getValidTabsWithMetadata(context.tabId),
-                        tabCount: (await K.getValidTabsWithMetadata(context.tabId)).length,
+                        availableTabs: await TabGroupManager.getValidTabsWithMetadata(context.tabId),
+                        tabCount: (await TabGroupManager.getValidTabsWithMetadata(context.tabId)).length,
                     },
                 };
             }
@@ -524,7 +524,7 @@ export const readNetworkRequestsTool = {
             const filterNote = filters.length > 0 ? ` (filtered by ${filters.join(", ")})` : "";
             const truncateNote = truncated ? ` (showing first ${limit} of ${requests.length})` : "";
             const header = `Found ${requests.length} network request${requests.length === 1 ? "" : "s"}${filterNote}${truncateNote}:`;
-            const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+            const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
             return {
                 output: `${header}\n\n${formatted}`,
                 tabContext: {
@@ -601,7 +601,7 @@ export const resizeWindowTool = {
             if (width > 7680 || height > 4320) {
                 throw new Error("Dimensions exceed 8K resolution limit. Maximum dimensions are 7680x4320");
             }
-            const effectiveTabId = await K.getEffectiveTabId(tabId, context.tabId);
+            const effectiveTabId = await TabGroupManager.getEffectiveTabId(tabId, context.tabId);
             const tab = await chrome.tabs.get(effectiveTabId);
             if (!tab.windowId) {
                 throw new Error("Tab does not have an associated window");

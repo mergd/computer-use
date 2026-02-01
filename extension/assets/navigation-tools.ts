@@ -9,8 +9,8 @@
  * - tabs_create_mcp: MCP-specific tabs create
  */
 
-import { K } from "./tab-group-manager.js";
-import { T as ToolTypes } from "./storage.js";
+import { K as TabGroupManager } from "./tab-group-manager.js";
+import { ToolPermissionType } from "./storage.js";
 import { DomainCategoryCache } from "./domain-cache.js";
 import { formatTabsResponse } from "./utils.js";
 
@@ -123,7 +123,7 @@ export const navigateTool: Tool<NavigateParams> = {
       if (!url) throw new Error("URL parameter is required");
       if (!context?.tabId) throw new Error("No active tab found");
 
-      const effectiveTabId = await K.getEffectiveTabId(tabId, context.tabId);
+      const effectiveTabId = await TabGroupManager.getEffectiveTabId(tabId, context.tabId);
 
       // Check domain category for non-navigation commands
       if (url && !["back", "forward"].includes(url.toLowerCase())) {
@@ -153,7 +153,7 @@ export const navigateTool: Tool<NavigateParams> = {
         await chrome.tabs.goBack(tab.id);
         await new Promise((resolve) => setTimeout(resolve, 100));
         const updatedTab = await chrome.tabs.get(tab.id);
-        const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+        const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
         return {
           output: `Navigated back to ${updatedTab.url}`,
           tabContext: {
@@ -170,7 +170,7 @@ export const navigateTool: Tool<NavigateParams> = {
         await chrome.tabs.goForward(tab.id);
         await new Promise((resolve) => setTimeout(resolve, 100));
         const updatedTab = await chrome.tabs.get(tab.id);
-        const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+        const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
         return {
           output: `Navigated forward to ${updatedTab.url}`,
           tabContext: {
@@ -201,7 +201,7 @@ export const navigateTool: Tool<NavigateParams> = {
         if (permResult.needsPrompt) {
           return {
             type: "permission_required",
-            tool: ToolTypes.NAVIGATE,
+            tool: ToolPermissionType.NAVIGATE,
             url: fullUrl,
             toolUseId,
           };
@@ -212,7 +212,7 @@ export const navigateTool: Tool<NavigateParams> = {
       await chrome.tabs.update(effectiveTabId, { url: fullUrl });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+      const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
       return {
         output: `Navigated to ${fullUrl}`,
         tabContext: {
@@ -264,7 +264,7 @@ export const tabsContextTool: Tool<TabsContextParams> = {
       if (!context?.tabId) throw new Error("No active tab found");
 
       const isMcpNative = context.sessionId === MCP_NATIVE_SESSION;
-      const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+      const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
       const tabContext: TabContext = {
         currentTabId: context.tabId,
         availableTabs: tabsMetadata,
@@ -315,7 +315,7 @@ export const tabsCreateTool: Tool<TabsCreateParams> = {
         await chrome.tabs.group({ tabIds: newTab.id, groupId: contextTab.groupId });
       }
 
-      const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+      const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
       return {
         output: `Created new tab. Tab ID: ${newTab.id}`,
         tabContext: {
@@ -357,8 +357,8 @@ export const tabsContextMcpTool: Tool<TabsContextMcpParams> = {
     try {
       const { createIfEmpty } = params || {};
 
-      await K.initialize();
-      const mcpContext = await K.getOrCreateMcpTabContext({ createIfEmpty }) as McpTabContextResult | undefined;
+      await TabGroupManager.initialize();
+      const mcpContext = await TabGroupManager.getOrCreateMcpTabContext({ createIfEmpty }) as McpTabContextResult | undefined;
 
       if (!mcpContext) {
         return {
@@ -407,8 +407,8 @@ export const tabsCreateMcpTool: Tool<TabsCreateMcpParams> = {
   parameters: {},
   execute: async (): Promise<ToolResult> => {
     try {
-      await K.initialize();
-      const mcpContext = await K.getOrCreateMcpTabContext({ createIfEmpty: false }) as McpTabContextResult | undefined;
+      await TabGroupManager.initialize();
+      const mcpContext = await TabGroupManager.getOrCreateMcpTabContext({ createIfEmpty: false }) as McpTabContextResult | undefined;
 
       if (!mcpContext?.tabGroupId) {
         return {

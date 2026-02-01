@@ -9,7 +9,7 @@
  * - Ie: update_plan tool
  */
 
-import { T as ToolTypes } from "./storage.js";
+import { ToolPermissionType } from "./storage.js";
 import { DomainCategoryCache } from "./domain-cache.js";
 import type {
   ToolResult,
@@ -260,7 +260,7 @@ export const updatePlanTool: UpdatePlanTool = {
 
     const result: PermissionRequiredResult & { actionData: PlanActionData } = {
       type: "permission_required",
-      tool: ToolTypes.PLAN_APPROVAL,
+      tool: ToolPermissionType.PLAN_APPROVAL,
       url: "",
       toolUseId: context?.toolUseId,
       actionData: { plan: { domains: domainCategories, approach } },

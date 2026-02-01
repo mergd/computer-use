@@ -8,9 +8,9 @@
  * - De: javascript_tool
  */
 
-import { re } from "./cdp-debugger.js";
-import { K } from "./tab-group-manager.js";
-import { T as ToolTypes } from "./storage.js";
+import { re as cdpDebugger } from "./cdp-debugger.js";
+import { K as TabGroupManager } from "./tab-group-manager.js";
+import { ToolPermissionType } from "./storage.js";
 import { checkNavigationInterception } from "./utils.js";
 
 // =============================================================================
@@ -169,7 +169,7 @@ export const readPageTool: Tool<ReadPageParams> = {
 
     if (!context?.tabId) throw new Error("No active tab found");
 
-    const effectiveTabId = await K.getEffectiveTabId(tabId, context.tabId);
+    const effectiveTabId = await TabGroupManager.getEffectiveTabId(tabId, context.tabId);
     const tab = await chrome.tabs.get(effectiveTabId);
     if (!tab.id) throw new Error("Active tab has no ID");
 
@@ -183,7 +183,7 @@ export const readPageTool: Tool<ReadPageParams> = {
       if (permResult.needsPrompt) {
         return {
           type: "permission_required",
-          tool: ToolTypes.READ_PAGE_CONTENT,
+          tool: ToolPermissionType.READ_PAGE_CONTENT,
           url,
           toolUseId,
         };
@@ -191,7 +191,7 @@ export const readPageTool: Tool<ReadPageParams> = {
       return { error: "Permission denied for reading pages on this domain" };
     }
 
-    await K.hideIndicatorForToolUse(effectiveTabId);
+    await TabGroupManager.hideIndicatorForToolUse(effectiveTabId);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     try {
@@ -220,7 +220,7 @@ export const readPageTool: Tool<ReadPageParams> = {
       if (result.error) return { error: result.error };
 
       const viewportInfo = `Viewport: ${result.viewport.width}x${result.viewport.height}`;
-      const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+      const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
 
       return {
         output: `${result.pageContent}\n\n${viewportInfo}`,
@@ -236,7 +236,7 @@ export const readPageTool: Tool<ReadPageParams> = {
         error: `Failed to read page: ${err instanceof Error ? err.message : "Unknown error"}`,
       };
     } finally {
-      await K.restoreIndicatorAfterToolUse(effectiveTabId);
+      await TabGroupManager.restoreIndicatorAfterToolUse(effectiveTabId);
     }
   },
   toAnthropicSchema: async () => ({
@@ -312,7 +312,7 @@ export const formInputTool: Tool<FormInputParams> = {
       }
       if (!context?.tabId) throw new Error("No active tab found");
 
-      const effectiveTabId = await K.getEffectiveTabId(args.tabId, context.tabId);
+      const effectiveTabId = await TabGroupManager.getEffectiveTabId(args.tabId, context.tabId);
       const tab = await chrome.tabs.get(effectiveTabId);
       if (!tab.id) throw new Error("Active tab has no ID");
 
@@ -326,7 +326,7 @@ export const formInputTool: Tool<FormInputParams> = {
         if (permResult.needsPrompt) {
           return {
             type: "permission_required",
-            tool: ToolTypes.TYPE,
+            tool: ToolPermissionType.TYPE,
             url,
             toolUseId,
             actionData: { ref: args.ref, value: args.value },
@@ -516,7 +516,7 @@ export const formInputTool: Tool<FormInputParams> = {
         throw new Error("Failed to execute form input");
       }
 
-      const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+      const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
       return {
         ...results[0].result,
         tabContext: {
@@ -585,7 +585,7 @@ export const getPageTextTool: Tool<GetPageTextParams> = {
 
     if (!context?.tabId) throw new Error("No active tab found");
 
-    const effectiveTabId = await K.getEffectiveTabId(tabId, context.tabId);
+    const effectiveTabId = await TabGroupManager.getEffectiveTabId(tabId, context.tabId);
     const url = (await chrome.tabs.get(effectiveTabId)).url;
 
     if (!url) throw new Error("No URL available for active tab");
@@ -597,7 +597,7 @@ export const getPageTextTool: Tool<GetPageTextParams> = {
       if (permResult.needsPrompt) {
         return {
           type: "permission_required",
-          tool: ToolTypes.READ_PAGE_CONTENT,
+          tool: ToolPermissionType.READ_PAGE_CONTENT,
           url,
           toolUseId,
         };
@@ -605,7 +605,7 @@ export const getPageTextTool: Tool<GetPageTextParams> = {
       return { error: "Permission denied for reading page content on this domain" };
     }
 
-    await K.hideIndicatorForToolUse(effectiveTabId);
+    await TabGroupManager.hideIndicatorForToolUse(effectiveTabId);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     try {
@@ -711,7 +711,7 @@ export const getPageTextTool: Tool<GetPageTextParams> = {
       }
 
       const result = results[0].result;
-      const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+      const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
 
       if (result.error) {
         return {
@@ -739,7 +739,7 @@ export const getPageTextTool: Tool<GetPageTextParams> = {
         error: `Failed to extract page text: ${err instanceof Error ? err.message : "Unknown error"}`,
       };
     } finally {
-      await K.restoreIndicatorAfterToolUse(effectiveTabId);
+      await TabGroupManager.restoreIndicatorAfterToolUse(effectiveTabId);
     }
   },
   toAnthropicSchema: async () => ({
@@ -799,7 +799,7 @@ export const javascriptTool: Tool<JavaScriptToolParams> = {
       if (!text) throw new Error("Code parameter is required");
       if (!context?.tabId) throw new Error("No active tab found");
 
-      const effectiveTabId = await K.getEffectiveTabId(tabId, context.tabId);
+      const effectiveTabId = await TabGroupManager.getEffectiveTabId(tabId, context.tabId);
       const url = (await chrome.tabs.get(effectiveTabId)).url;
 
       if (!url) throw new Error("No URL available for active tab");
@@ -811,7 +811,7 @@ export const javascriptTool: Tool<JavaScriptToolParams> = {
         if (permResult.needsPrompt) {
           return {
             type: "permission_required",
-            tool: ToolTypes.EXECUTE_JAVASCRIPT,
+            tool: ToolPermissionType.EXECUTE_JAVASCRIPT,
             url,
             toolUseId,
             actionData: { text },
@@ -834,7 +834,7 @@ export const javascriptTool: Tool<JavaScriptToolParams> = {
         })()
       `;
 
-      const evalResult = await re.sendCommand(effectiveTabId, "Runtime.evaluate", {
+      const evalResult = await cdpDebugger.sendCommand(effectiveTabId, "Runtime.evaluate", {
         expression: wrappedCode,
         returnByValue: true,
         awaitPromise: true,
@@ -935,7 +935,7 @@ export const javascriptTool: Tool<JavaScriptToolParams> = {
         output = "undefined";
       }
 
-      const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+      const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
 
       if (hasError) {
         return {

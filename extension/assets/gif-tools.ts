@@ -7,9 +7,9 @@
  * - Se: getActionDelay helper
  */
 
-import { re } from "./cdp-debugger.js";
-import { K } from "./tab-group-manager.js";
-import { S as StorageKeys, T as ToolTypes } from "./storage.js";
+import { re as cdpDebugger } from "./cdp-debugger.js";
+import { K as TabGroupManager } from "./tab-group-manager.js";
+import { StorageKeys, ToolPermissionType } from "./storage.js";
 import { checkNavigationInterception } from "./utils.js";
 import type {
   GifFrame,
@@ -246,7 +246,7 @@ async function handleExport(
       if (permResult.needsPrompt) {
         return {
           type: "permission_required",
-          tool: ToolTypes.UPLOAD_IMAGE,
+          tool: ToolPermissionType.UPLOAD_IMAGE,
           url,
           toolUseId,
           actionData: { coordinate: params.coordinate },
@@ -392,7 +392,7 @@ async function handleExport(
 
   gifFrameStorage.clearFrames(groupId);
 
-  const tabsMetadata: TabMetadata[] = await K.getValidTabsWithMetadata(context.tabId);
+  const tabsMetadata: TabMetadata[] = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
   return {
     output: outputMessage,
     tabContext: {

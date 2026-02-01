@@ -2,29 +2,31 @@
  * tab-group-manager.ts - Chrome Tab Group Management
  *
  * CLASSES:
- *   M = TabSubscriptionManager - Manages tab event subscriptions
- *   H = TabGroupManager        - Manages Chrome tab groups for MCP sessions
+ *   TabSubscriptionManager - Manages tab event subscriptions
+ *   TabGroupManager        - Manages Chrome tab groups for MCP sessions
  *
  * SINGLETONS:
- *   D = () => TabSubscriptionManager.getInstance()
- *   K = TabGroupManager.getInstance()
+ *   getTabSubscriptionManagerInstance = () => TabSubscriptionManager.getInstance()
+ *   tabGroupManagerInstance = TabGroupManager.getInstance()
  *
- * EXPORTS:
- *   K (TabGroupManager singleton)
- *   H (TabGroupManager class)
- *   j ("Computer Control" constant)
- *   z ("MCP" constant)
+ * EXPORTS (with backward-compatible aliases):
+ *   tabGroupManagerInstance (alias: K)
+ *   TabGroupManager (alias: H)
+ *   COMPUTER_CONTROL (alias: j) - "Computer Control" constant
+ *   MCP (alias: z) - "MCP" constant
+ *   getTabSubscriptionManagerInstance (alias: D)
+ *   TabSubscriptionManager (alias: M)
  */
-import { S as StorageKeys } from "./storage.js";
+import { StorageKeys } from "./storage.js";
 // DomainCategoryCache is imported from mcp-tools.js
 let W = null;
 export function setDomainCategoryCache(cache) {
     W = cache;
 }
 // ============================================================================
-// TabSubscriptionManager (class M) - Manages tab event subscriptions
+// TabSubscriptionManager - Manages tab event subscriptions
 // ============================================================================
-class M {
+class TabSubscriptionManager {
     static instance = null;
     subscriptions = new Map();
     chromeUpdateListener = null;
@@ -34,10 +36,10 @@ class M {
     nextSubscriptionId = 1;
     constructor() { }
     static getInstance() {
-        if (!M.instance) {
-            M.instance = new M();
+        if (!TabSubscriptionManager.instance) {
+            TabSubscriptionManager.instance = new TabSubscriptionManager();
         }
-        return M.instance;
+        return TabSubscriptionManager.instance;
     }
     subscribe(tabId, eventTypes, callback) {
         const subscriptionId = "sub_" + this.nextSubscriptionId++;
@@ -203,14 +205,14 @@ class M {
             this.chromeRemovedListener !== null);
     }
 }
-const D = () => M.getInstance();
-const j = "Computer Control";
-const z = "MCP";
+const getTabSubscriptionManagerInstance = () => TabSubscriptionManager.getInstance();
+const COMPUTER_CONTROL = "Computer Control";
+const MCP = "MCP";
 // ============================================================================
-// TabGroupManager (class H) - Manages Chrome tab groups for MCP sessions
-// Singleton accessed via K = H.getInstance()
+// TabGroupManager - Manages Chrome tab groups for MCP sessions
+// Singleton accessed via tabGroupManagerInstance = TabGroupManager.getInstance()
 // ============================================================================
-class H {
+class TabGroupManager {
     static instance;
     groupMetadata = new Map();
     initialized = false;
@@ -239,10 +241,10 @@ class H {
         });
     }
     static getInstance() {
-        if (!H.instance) {
-            H.instance = new H();
+        if (!TabGroupManager.instance) {
+            TabGroupManager.instance = new TabGroupManager();
         }
-        return H.instance;
+        return TabGroupManager.instance;
     }
     async dismissStaticIndicatorsForGroup(chromeGroupId) {
         const storage = await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY);
@@ -291,7 +293,7 @@ class H {
     startTabGroupChangeListener() {
         if (this.isTabGroupListenerStarted)
             return;
-        const manager = D();
+        const manager = getTabSubscriptionManagerInstance();
         this.tabGroupListenerSubscriptionId = manager.subscribe("all", ["groupId"], async (tabId, changeInfo) => {
             if ("groupId" in changeInfo) {
                 await this.handleTabGroupChange(tabId, changeInfo.groupId);
@@ -302,7 +304,7 @@ class H {
     stopTabGroupChangeListener() {
         if (!this.isTabGroupListenerStarted || !this.tabGroupListenerSubscriptionId)
             return;
-        D().unsubscribe(this.tabGroupListenerSubscriptionId);
+        getTabSubscriptionManagerInstance().unsubscribe(this.tabGroupListenerSubscriptionId);
         this.tabGroupListenerSubscriptionId = null;
         this.isTabGroupListenerStarted = false;
     }
@@ -339,7 +341,7 @@ class H {
                                 tabIds: [mainTabId],
                             });
                             await chrome.tabGroups.update(newChromeGroupId, {
-                                title: j,
+                                title: COMPUTER_CONTROL,
                                 color: chrome.tabGroups.Color.ORANGE,
                                 collapsed: false,
                             });
@@ -484,7 +486,7 @@ class H {
             }
             const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
             await chrome.tabGroups.update(newGroupId, {
-                title: j,
+                title: COMPUTER_CONTROL,
                 color: chrome.tabGroups.Color.ORANGE,
                 collapsed: false,
             });
@@ -519,7 +521,7 @@ class H {
                 try {
                     const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
                     await chrome.tabGroups.update(newGroupId, {
-                        title: j,
+                        title: COMPUTER_CONTROL,
                         color: chrome.tabGroups.Color.ORANGE,
                         collapsed: false,
                     });
@@ -640,7 +642,7 @@ class H {
             throw new Error("Failed to create Chrome tab group");
         }
         await chrome.tabGroups.update(chromeGroupId, {
-            title: j,
+            title: COMPUTER_CONTROL,
             color: chrome.tabGroups.Color.ORANGE,
             collapsed: false,
         });
@@ -1467,7 +1469,7 @@ class H {
             return;
         try {
             const group = await chrome.tabGroups.get(metadata.chromeGroupId);
-            if (group.title !== j)
+            if (group.title !== COMPUTER_CONTROL)
                 return;
             const otherGroups = await chrome.tabGroups.query({});
             const usedColors = otherGroups
@@ -1662,10 +1664,10 @@ class H {
     async ensureMcpGroupCharacteristics(groupId) {
         try {
             const group = await chrome.tabGroups.get(groupId);
-            if (group.title !== z ||
+            if (group.title !== MCP ||
                 group.color !== chrome.tabGroups.Color.YELLOW) {
                 await chrome.tabGroups.update(groupId, {
-                    title: z,
+                    title: MCP,
                     color: chrome.tabGroups.Color.YELLOW,
                 });
             }
@@ -1715,7 +1717,7 @@ class H {
             }
             const group = await this.createGroup(newTabId);
             await chrome.tabGroups.update(group.chromeGroupId, {
-                title: z,
+                title: MCP,
                 color: chrome.tabGroups.Color.YELLOW,
             });
             this.mcpTabGroupId = group.chromeGroupId;
@@ -1765,7 +1767,7 @@ class H {
             const groups = await chrome.tabGroups.query({});
             for (const group of groups) {
                 if (group.color === chrome.tabGroups.Color.YELLOW &&
-                    group.title?.includes(z)) {
+                    group.title?.includes(MCP)) {
                     const tabs = await chrome.tabs.query({ groupId: group.id });
                     if (tabs.length > 0) {
                         return group.id;
@@ -1826,6 +1828,7 @@ class H {
         }
     }
 }
-// K = TabGroupManager singleton instance
-const K = H.getInstance();
-export { K, H, j, z, D, M };
+// tabGroupManagerInstance = TabGroupManager singleton instance
+const tabGroupManagerInstance = TabGroupManager.getInstance();
+// Export with full names and backward-compatible single-letter aliases
+export { tabGroupManagerInstance, tabGroupManagerInstance as K, TabGroupManager, TabGroupManager as H, COMPUTER_CONTROL, COMPUTER_CONTROL as j, MCP, MCP as z, getTabSubscriptionManagerInstance, getTabSubscriptionManagerInstance as D, TabSubscriptionManager, TabSubscriptionManager as M, };

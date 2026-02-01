@@ -6,8 +6,8 @@
  * - Ce: gif_creator tool
  * - Se: getActionDelay helper
  */
-import { K } from "./tab-group-manager.js";
-import { S as StorageKeys, T as ToolTypes } from "./storage.js";
+import { K as TabGroupManager } from "./tab-group-manager.js";
+import { StorageKeys, ToolPermissionType } from "./storage.js";
 import { checkNavigationInterception } from "./utils.js";
 // =============================================================================
 // GIF Frame Storage Class
@@ -148,7 +148,7 @@ async function handleExport(params, tab, groupId, context) {
             if (permResult.needsPrompt) {
                 return {
                     type: "permission_required",
-                    tool: ToolTypes.UPLOAD_IMAGE,
+                    tool: ToolPermissionType.UPLOAD_IMAGE,
                     url,
                     toolUseId,
                     actionData: { coordinate: params.coordinate },
@@ -272,7 +272,7 @@ async function handleExport(params, tab, groupId, context) {
         outputMessage = `Successfully exported GIF with ${frames.length} frames. ${uploadOutput.output}. Dimensions: ${gifResult.width}x${gifResult.height}. Recording cleared.`;
     }
     gifFrameStorage.clearFrames(groupId);
-    const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+    const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
     return {
         output: outputMessage,
         tabContext: {

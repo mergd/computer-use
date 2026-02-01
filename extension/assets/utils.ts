@@ -9,7 +9,7 @@
  * - Domain utilities
  */
 
-import { k as generateScreenshotId } from "./storage.js";
+import { generateScreenshotId } from "./storage.js";
 
 // =============================================================================
 // Type Definitions
@@ -145,7 +145,7 @@ export function assertNotRestrictedTab(tab: Tab | undefined | null): void {
 // =============================================================================
 
 /**
- * Format available tabs for output (R)
+ * Format available tabs for output
  */
 export function formatTabsResponse(tabs: Tab[], tabGroupId?: number): string {
   const result: TabsResponse = {
@@ -162,7 +162,7 @@ export function formatTabsResponse(tabs: Tab[], tabGroupId?: number): string {
 }
 
 /**
- * Format tab context with optional skills (U)
+ * Format tab context with optional skills
  */
 export function formatTabContextResponse(context: TabContext): string {
   const result: TabContextResponse = {};
@@ -183,7 +183,7 @@ export function formatTabContextResponse(context: TabContext): string {
 }
 
 /**
- * Strip system reminders from text (P)
+ * Strip system reminders from text
  */
 export function stripSystemReminders(text: string): string {
   return text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "").trim();
@@ -194,7 +194,7 @@ export function stripSystemReminders(text: string): string {
 // =============================================================================
 
 /**
- * Convert tools to Anthropic schema format (G)
+ * Convert tools to Anthropic schema format
  */
 export const toAnthropicSchemas = async (
   tools: Tool[],
@@ -203,7 +203,7 @@ export const toAnthropicSchemas = async (
   await Promise.all(tools.map((tool) => tool.toAnthropicSchema(context)));
 
 /**
- * Coerce parameter types based on tool schema (B)
+ * Coerce parameter types based on tool schema
  */
 export const coerceParameterTypes = (
   toolName: string,
@@ -229,7 +229,7 @@ export const coerceParameterTypes = (
 };
 
 /**
- * Parse array from string or return as-is (O)
+ * Parse array from string or return as-is
  */
 export const parseArrayParam = <T = unknown>(
   value: unknown,
@@ -252,7 +252,7 @@ export const parseArrayParam = <T = unknown>(
 // =============================================================================
 
 /**
- * Find image by ID in message history ($)
+ * Find image by ID in message history
  */
 export function findImageInMessages(
   messages: Message[],
@@ -331,7 +331,7 @@ export function findImageInMessages(
 }
 
 /**
- * Extract width or height from dimension string (L - image dimension)
+ * Extract width or height from dimension string
  */
 export function extractImageDimension(
   text: string | undefined | null,
@@ -348,7 +348,7 @@ export function extractImageDimension(
 // =============================================================================
 
 /**
- * Extract hostname from URL (N)
+ * Extract hostname from URL
  */
 export function extractHostname(url: string): string {
   if (!url.startsWith("http")) {
@@ -362,7 +362,7 @@ export function extractHostname(url: string): string {
 }
 
 /**
- * Normalize domain for cache lookups (q)
+ * Normalize domain for cache lookups
  */
 export function normalizeDomain(url: string): string {
   return url
@@ -372,7 +372,7 @@ export function normalizeDomain(url: string): string {
 }
 
 /**
- * Check if navigation crossed domains during an action (F)
+ * Check if navigation crossed domains during an action
  */
 export async function checkNavigationInterception(
   tabId: number,
@@ -405,21 +405,3 @@ export async function checkNavigationInterception(
 
 // Re-export generateId for screenshot IDs
 export { generateId };
-
-// =============================================================================
-// Single-letter Aliases for Backward Compatibility
-// =============================================================================
-
-export {
-  formatTabsResponse as R,
-  formatTabContextResponse as U,
-  stripSystemReminders as P,
-  toAnthropicSchemas as G,
-  coerceParameterTypes as B,
-  parseArrayParam as O,
-  findImageInMessages as $,
-  extractImageDimension as L,
-  extractHostname as N,
-  normalizeDomain as q,
-  checkNavigationInterception as F,
-};

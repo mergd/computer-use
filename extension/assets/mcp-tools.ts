@@ -3,46 +3,75 @@
  *
  * This is the main entry point that orchestrates all MCP tool modules.
  *
- * EXPORTS for service-worker.js:
- *   L (nr) = notifyDisconnection
- *   t (K)  = TabGroupManager singleton
- *   M (Xt) = createErrorResponse
- *   N (Qt) = executeToolRequest
+ * EXPORTS for service-worker.js (keeping single-letter aliases for backward compatibility):
+ *   L = notifyDisconnection
+ *   t = tabGroupManager (K)
+ *   M = createErrorResponse
+ *   N = executeToolRequest
  *
  * Additional exports for other modules.
  */
 
 // Core imports
-import { re, Q, setTabGroupManager } from "./cdp-debugger.js";
-import { K, H, j, z, D, M as TabGroupManagerM, setDomainCategoryCache } from "./tab-group-manager.js";
+import { re as cdpDebugger, Q as screenshotContext, setTabGroupManager } from "./cdp-debugger.js";
+import {
+  K as tabGroupManager,
+  H as TabGroupManagerClass,
+  j as COMPUTER_CONTROL,
+  z as MCP,
+  D as getTabSubscriptionManager,
+  M as TabSubscriptionManagerClass,
+  setDomainCategoryCache,
+} from "./tab-group-manager.js";
 import { S as StorageKeys, d as getOrCreateAnonymousId } from "./storage.js";
 
 // Module imports
 import {
   isRestrictedUrl,
-  formatTabsResponse as R,
-  formatTabContextResponse as U,
-  stripSystemReminders as P,
-  toAnthropicSchemas as G,
-  coerceParameterTypes as B,
-  parseArrayParam as O,
-  findImageInMessages as $,
+  formatTabsResponse,
+  formatTabContextResponse,
+  stripSystemReminders,
+  toAnthropicSchemas,
+  coerceParameterTypes,
+  parseArrayParam,
+  findImageInMessages,
   extractHostname,
 } from "./utils.js";
 
-import { DomainCategoryCache, W } from "./domain-cache.js";
+import { DomainCategoryCache, W as domainCategoryCache } from "./domain-cache.js";
 
-import { computerTool as ie } from "./computer-tool.js";
-import { readPageTool as le, formInputTool as de, getPageTextTool as he, javascriptTool as De } from "./page-tools.js";
-import { navigateTool as Y, tabsContextTool as me, tabsCreateTool as ge, tabsContextMcpTool, tabsCreateMcpTool, MCP_NATIVE_SESSION } from "./navigation-tools.js";
-import { shouldEnterPlanMode as be, getPlanModeReminder as we, filterAndApproveDomains as ye, planSchema as ve, updatePlanTool as Ie } from "./plan-tools.js";
-import { gifFrameStorage as xe, gifCreatorTool as Ce, getActionDelay as Se } from "./gif-tools.js";
-import { uploadImageTool as Te, readConsoleMessagesTool as ke, readNetworkRequestsTool as _e, resizeWindowTool as Ee, turnAnswerStartTool as Me, shortcutsListTool, shortcutsExecuteTool } from "./utility-tools.js";
+import { computerTool } from "./computer-tool.js";
+import { readPageTool, formInputTool, getPageTextTool, javascriptTool } from "./page-tools.js";
 import {
-  ToolCallHandler as ze,
-  toolRegistry as We,
-  mcpOnlyToolNames as je,
-  getOrCreateToolHandler as Vt,
+  navigateTool,
+  tabsContextTool,
+  tabsCreateTool,
+  tabsContextMcpTool,
+  tabsCreateMcpTool,
+  MCP_NATIVE_SESSION,
+} from "./navigation-tools.js";
+import {
+  shouldEnterPlanMode,
+  getPlanModeReminder,
+  filterAndApproveDomains,
+  planSchema,
+  updatePlanTool,
+} from "./plan-tools.js";
+import { gifFrameStorage, gifCreatorTool, getActionDelay } from "./gif-tools.js";
+import {
+  uploadImageTool,
+  readConsoleMessagesTool,
+  readNetworkRequestsTool,
+  resizeWindowTool,
+  turnAnswerStartTool,
+  shortcutsListTool,
+  shortcutsExecuteTool,
+} from "./utility-tools.js";
+import {
+  ToolCallHandler,
+  toolRegistry,
+  mcpOnlyToolNames,
+  getOrCreateToolHandler,
   setPermissionPromptHandler,
   setPendingError,
   getPendingError,
@@ -66,23 +95,23 @@ import type {
 declare const self: typeof globalThis & { __skipPermissions?: boolean };
 
 // Initialize dependency injection
-setDomainCategoryCache(W);
-setTabGroupManager(K);
+setDomainCategoryCache(domainCategoryCache);
+setTabGroupManager(tabGroupManager);
 
 // ============================================================================
 // Navigation and tab context helpers
 // ============================================================================
 
 /**
- * Check if tab is main or secondary tab in a group (Re)
+ * Check if tab is main or secondary tab in a group
  */
 async function checkTabContext(
   mainTabId: number,
   targetTabId: number
 ): Promise<TabContextCheckResult> {
   const isMainTab = targetTabId === mainTabId;
-  await K.initialize();
-  const group = await K.findGroupByTab(targetTabId);
+  await tabGroupManager.initialize();
+  const group = await tabGroupManager.findGroupByTab(targetTabId);
   return {
     isMainTab,
     isSecondaryTab: !!group && group.mainTabId === mainTabId && targetTabId !== mainTabId,
@@ -91,14 +120,14 @@ async function checkTabContext(
 }
 
 /**
- * Check if category is restricted (Ue)
+ * Check if category is restricted
  */
 function isRestrictedCategory(category: DomainCategory): boolean {
   return category === "category1" || category === "category2";
 }
 
 /**
- * Get hostname from URL (Pe)
+ * Get hostname from URL
  */
 function getHostnameFromUrl(url: string): string | null {
   try {
@@ -115,14 +144,16 @@ interface DomainChangeResult {
 }
 
 /**
- * Check for domain change during navigation (Ge)
+ * Check for domain change during navigation
  */
 function checkDomainChange(oldUrl: string | undefined, newUrl: string): DomainChangeResult | null {
   if (!oldUrl) return null;
-  if (oldUrl.startsWith("chrome://") ||
-      oldUrl.startsWith("chrome-extension://") ||
-      oldUrl.startsWith("about:") ||
-      oldUrl === "") {
+  if (
+    oldUrl.startsWith("chrome://") ||
+    oldUrl.startsWith("chrome-extension://") ||
+    oldUrl.startsWith("about:") ||
+    oldUrl === ""
+  ) {
     return null;
   }
 
@@ -136,16 +167,16 @@ function checkDomainChange(oldUrl: string | undefined, newUrl: string): DomainCh
 }
 
 /**
- * Update tab blocklist status (Be)
+ * Update tab blocklist status
  */
 async function updateBlocklistStatus(tabId: number, url: string): Promise<DomainCategory> {
-  const category = await W.getCategory(url);
-  await K.updateTabBlocklistStatus(tabId, url);
+  const category = await domainCategoryCache.getCategory(url);
+  await tabGroupManager.updateTabBlocklistStatus(tabId, url);
   return category ?? null;
 }
 
 /**
- * Get blocked page URL (Oe)
+ * Get blocked page URL
  */
 function getBlockedPageUrl(url: string): string {
   return chrome.runtime.getURL(`blocked.html?url=${encodeURIComponent(url)}`);
@@ -160,7 +191,7 @@ interface DomainTransitionActionData {
 }
 
 /**
- * Create domain transition permission request ($e)
+ * Create domain transition permission request
  */
 function createDomainTransitionRequest(
   fromDomain: string,
@@ -194,7 +225,7 @@ interface FeatureFlags {
 }
 
 /**
- * Feature flags stub (qe) - disabled for MCP mode
+ * Feature flags stub - disabled for MCP mode
  */
 async function getFeatureFlags(context: FeatureFlagsContext): Promise<FeatureFlags> {
   return {};
@@ -204,12 +235,12 @@ async function getFeatureFlags(context: FeatureFlagsContext): Promise<FeatureFla
 // MCP Tool Execution State
 // ============================================================================
 
-const activeToolCalls: Map<number, ActiveToolCallInfo> = new Map(); // Zt
-const prefixTimeouts: Map<number, ReturnType<typeof setTimeout> | null> = new Map(); // er
-const PREFIX_TIMEOUT_MS = 20000; // tr
+const activeToolCalls: Map<number, ActiveToolCallInfo> = new Map();
+const prefixTimeouts: Map<number, ReturnType<typeof setTimeout> | null> = new Map();
+const PREFIX_TIMEOUT_MS = 20000;
 
 /**
- * Clean up after tool execution (rr)
+ * Clean up after tool execution
  */
 function cleanupAfterToolExecution(tabId: number, clientId?: string): void {
   if (activeToolCalls.has(tabId)) {
@@ -218,10 +249,10 @@ function cleanupAfterToolExecution(tabId: number, clientId?: string): void {
 
     const timeout = setTimeout(async () => {
       if (!activeToolCalls.has(tabId) && prefixTimeouts.has(tabId)) {
-        K.addCompletionPrefix(tabId).catch(() => {});
+        tabGroupManager.addCompletionPrefix(tabId).catch(() => {});
         prefixTimeouts.set(tabId, null);
         try {
-          await re.detachDebugger(tabId);
+          await cdpDebugger.detachDebugger(tabId);
         } catch {}
       }
     }, PREFIX_TIMEOUT_MS);
@@ -231,21 +262,21 @@ function cleanupAfterToolExecution(tabId: number, clientId?: string): void {
 }
 
 /**
- * Clean up tab completely (or)
+ * Clean up tab completely
  */
 function cleanupTab(tabId: number): void {
   const timeout = prefixTimeouts.get(tabId);
   if (timeout) clearTimeout(timeout);
   prefixTimeouts.delete(tabId);
-  K.removePrefix(tabId).catch(() => {});
+  tabGroupManager.removePrefix(tabId).catch(() => {});
 }
 
 /**
- * Notify disconnection - called when native host disconnects (nr)
+ * Notify disconnection - called when native host disconnects
  */
 async function notifyDisconnection(): Promise<void> {
   try {
-    const groups = await K.getAllGroups();
+    const groups = await tabGroupManager.getAllGroups();
     for (const group of groups) {
       cleanupTab(group.mainTabId);
     }
@@ -256,7 +287,7 @@ async function notifyDisconnection(): Promise<void> {
 // Permission Prompt for MCP Mode
 // ============================================================================
 
-let permissionPromptChain: Promise<boolean> = Promise.resolve(true); // ir
+let permissionPromptChain: Promise<boolean> = Promise.resolve(true);
 
 async function promptForMcpPermission(
   permRequest: PermissionRequiredResult,
@@ -281,7 +312,7 @@ async function showPermissionPromptWindow(
   if (existingTimeout) clearTimeout(existingTimeout);
 
   // Show permission prefix
-  await K.addPermissionPrefix(tabId);
+  await tabGroupManager.addPermissionPrefix(tabId);
   prefixTimeouts.set(tabId, null);
 
   // Store prompt data
@@ -301,7 +332,7 @@ async function showPermissionPromptWindow(
       if (windowId) {
         chrome.windows.remove(windowId).catch(() => {});
       }
-      await K.addLoadingPrefix(tabId);
+      await tabGroupManager.addLoadingPrefix(tabId);
       prefixTimeouts.set(tabId, null);
       resolve(allowed);
     };
@@ -357,7 +388,7 @@ setPermissionPromptHandler(async (permRequest, tabId) => {
 // ============================================================================
 
 /**
- * Create error response (Xt)
+ * Create error response
  */
 const createErrorResponse = (message: string): McpErrorResponse => ({
   content: [{ type: "text", text: message }],
@@ -365,9 +396,11 @@ const createErrorResponse = (message: string): McpErrorResponse => ({
 });
 
 /**
- * Execute tool request - main entry point (Qt)
+ * Execute tool request - main entry point
  */
-async function executeToolRequest(request: McpToolRequest): Promise<FormattedToolResult | McpErrorResponse> {
+async function executeToolRequest(
+  request: McpToolRequest
+): Promise<FormattedToolResult | McpErrorResponse> {
   const toolUseId = crypto.randomUUID();
   const clientId = request.clientId;
   const startTime = Date.now();
@@ -387,7 +420,7 @@ async function executeToolRequest(request: McpToolRequest): Promise<FormattedToo
   let domain: string | undefined;
   let tabGroupId: number | undefined;
   try {
-    const tabInfo = await K.getTabForMcp(request.tabId, request.tabGroupId);
+    const tabInfo = await tabGroupManager.getTabForMcp(request.tabId, request.tabGroupId);
     tabId = tabInfo.tabId;
     domain = tabInfo.domain;
 
@@ -407,8 +440,8 @@ async function executeToolRequest(request: McpToolRequest): Promise<FormattedToo
   // Attach debugger if needed
   if (tabId !== undefined) {
     try {
-      const wasAttached = await re.isDebuggerAttached(tabId);
-      await re.attachDebugger(tabId);
+      const wasAttached = await cdpDebugger.isDebuggerAttached(tabId);
+      await cdpDebugger.attachDebugger(tabId);
       if (!wasAttached) {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
@@ -430,7 +463,7 @@ async function executeToolRequest(request: McpToolRequest): Promise<FormattedToo
         },
       });
 
-      await K.addTabToIndicatorGroup({
+      await tabGroupManager.addTabToIndicatorGroup({
         tabId,
         isRunning: true,
         isMcp: true,
@@ -439,16 +472,16 @@ async function executeToolRequest(request: McpToolRequest): Promise<FormattedToo
       if (prefixTimeouts.has(tabId)) {
         const existingTimeout = prefixTimeouts.get(tabId);
         if (existingTimeout) clearTimeout(existingTimeout);
-        K.addLoadingPrefix(tabId).catch(() => {});
+        tabGroupManager.addLoadingPrefix(tabId).catch(() => {});
         prefixTimeouts.set(tabId, null);
       } else {
-        K.addLoadingPrefix(tabId).catch(() => {});
+        tabGroupManager.addLoadingPrefix(tabId).catch(() => {});
         prefixTimeouts.set(tabId, null);
       }
     }
 
     // Execute tool
-    const handler = await Vt(tabId, request.tabGroupId);
+    const handler = await getOrCreateToolHandler(tabId, request.tabGroupId);
     const [toolResult] = await handler.processToolResults([
       { type: "tool_use", id: toolUseId, name: request.toolName, input: request.args },
     ]);
@@ -481,7 +514,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const { isMainTab, isSecondaryTab } = await checkTabContext(details.tabId, details.tabId);
   if (!isMainTab && !isSecondaryTab) return;
 
-  await Vt(details.tabId, undefined);
+  await getOrCreateToolHandler(details.tabId, undefined);
 
   try {
     const category = await updateBlocklistStatus(details.tabId, details.url);
@@ -509,49 +542,53 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 // EXPORTS
 // ============================================================================
 
+// Main exports for service-worker.js (single-letter aliases for backward compatibility)
 export {
-  // Main exports for service-worker.js
   notifyDisconnection as L,
-  K as t,
+  tabGroupManager as t,
   createErrorResponse as M,
   executeToolRequest as N,
+};
 
-  // Tool exports
-  Ce as A,
-  W as B,
-  Me as C,
-  De as D,
-  B as E,
-  U as F,
-  ye as G,
-  we as H,
-  G as I,
-  re as J,
-  $ as K,
+// Tool exports (single-letter aliases for backward compatibility)
+export {
+  gifCreatorTool as A,
+  domainCategoryCache as B,
+  turnAnswerStartTool as C,
+  javascriptTool as D,
+  coerceParameterTypes as E,
+  formatTabContextResponse as F,
+  filterAndApproveDomains as G,
+  getPlanModeReminder as H,
+  toAnthropicSchemas as I,
+  cdpDebugger as J,
+  findImageInMessages as K,
+};
 
-  // Helper exports
+// Helper exports (single-letter aliases for backward compatibility)
+export {
   checkTabContext as a,
   getOrCreateAnonymousId as b,
   isRestrictedCategory as c,
   getBlockedPageUrl as d,
   checkDomainChange as e,
   createDomainTransitionRequest as f,
-  D as g,
+  getTabSubscriptionManager as g,
   getFeatureFlags as h,
-  de as j,
-  ie as k,
-  Y as l,
-  he as m,
-  be as n,
-  Ie as o,
-  O as p,
-  ge as q,
-  le as r,
-  P as s,
+  formInputTool as j,
+  computerTool as k,
+  navigateTool as l,
+  getPageTextTool as m,
+  shouldEnterPlanMode as n,
+  updatePlanTool as o,
+  parseArrayParam as p,
+  tabsCreateTool as q,
+  readPageTool as r,
+  stripSystemReminders as s,
   updateBlocklistStatus as u,
-  me as v,
-  Te as w,
-  ke as x,
-  _e as y,
-  Ee as z,
+  tabsContextTool as v,
+  uploadImageTool as w,
+  readConsoleMessagesTool as x,
+  readNetworkRequestsTool as y,
+  resizeWindowTool as z,
 };
