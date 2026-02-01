@@ -7,8 +7,8 @@
  * - he: get_page_text tool
  * - De: javascript_tool
  */
-import { re as cdpDebugger } from "./cdp-debugger.js";
-import { K as TabGroupManager } from "./tab-group-manager.js";
+import { cdpDebuggerInstance as cdpDebugger } from "./cdp-debugger.js";
+import { tabGroupManagerInstance as TabGroupManager } from "./tab-group-manager.js";
 import { ToolPermissionType } from "./storage.js";
 import { checkNavigationInterception } from "./utils.js";
 // Window globals (__generateAccessibilityTree, __claudeElementMap) are declared in types.ts
@@ -785,10 +785,3 @@ export const javascriptTool = {
         },
     }),
 };
-// =============================================================================
-// Aliases for backward compatibility
-// =============================================================================
-export { readPageTool as le };
-export { formInputTool as de };
-export { getPageTextTool as he };
-export { javascriptTool as De };

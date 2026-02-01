@@ -186,11 +186,3 @@ export const updatePlanTool = {
         };
     },
 };
-// =============================================================================
-// Backward Compatibility Aliases
-// =============================================================================
-export { shouldEnterPlanMode as be };
-export { getPlanModeReminder as we };
-export { filterAndApproveDomains as ye };
-export { planSchema as ve };
-export { updatePlanTool as Ie };

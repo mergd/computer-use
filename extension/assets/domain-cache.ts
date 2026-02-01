@@ -5,7 +5,7 @@
  * Used to check if domains are blocked or restricted
  */
 
-import { x as getApiToken } from "./storage.js";
+import { getApiToken } from "./storage.js";
 import { normalizeDomain, extractHostname } from "./utils.js";
 
 /** Response data from the domain info API */
@@ -104,5 +104,3 @@ export class DomainCategoryCache {
   }
 }
 
-// Alias for backward compatibility
-export { DomainCategoryCache as W };

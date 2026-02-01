@@ -11,21 +11,21 @@
  */
 
 import {
-  s as setStorageValue,
-  S as StorageKeys,
-  h as getApiConfig,
-  H as handleLogout,
-  _ as dynamicImport,
-  I as handleOAuthRedirect,
-  b as SavedPromptsService,
+  setStorageValue,
+  StorageKeys,
+  getEnvironmentConfig,
+  handleLogout,
+  dynamicImport,
+  handleOAuthRedirect,
+  SavedPromptsService,
   SavedPrompt,
 } from "./storage.js";
 
 import {
-  L as notifyDisconnection,
-  t as TabGroupManager,
-  M as createErrorResponse,
-  N as executeToolRequest,
+  notifyDisconnection,
+  tabGroupManager as TabGroupManager,
+  createErrorResponse,
+  executeToolRequest,
 } from "./mcp-tools.js";
 
 import type {
@@ -584,7 +584,7 @@ function sendToolResponse(
  * Set up declarative net request rules for API requests
  */
 async function setupNetRequestRules(): Promise<void> {
-  const apiConfig = getApiConfig();
+  const apiConfig = getEnvironmentConfig();
   const userAgent = `claude-browser-extension/${chrome.runtime.getManifest().version} (external) ${navigator.userAgent}`;
 
   const rules: chrome.declarativeNetRequest.Rule[] = [

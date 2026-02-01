@@ -3,27 +3,27 @@
  *
  * This is the main entry point that orchestrates all MCP tool modules.
  *
- * EXPORTS for service-worker.js (keeping single-letter aliases for backward compatibility):
- *   L = notifyDisconnection
- *   t = tabGroupManager (K)
- *   M = createErrorResponse
- *   N = executeToolRequest
+ * Main exports for service-worker.js:
+ *   - notifyDisconnection
+ *   - tabGroupManager
+ *   - createErrorResponse
+ *   - executeToolRequest
  *
  * Additional exports for other modules.
  */
 
 // Core imports
-import { re as cdpDebugger, Q as screenshotContext, setTabGroupManager } from "./cdp-debugger.js";
+import { cdpDebuggerInstance as cdpDebugger, screenshotContext, setTabGroupManager } from "./cdp-debugger.js";
 import {
-  K as tabGroupManager,
-  H as TabGroupManagerClass,
-  j as COMPUTER_CONTROL,
-  z as MCP,
-  D as getTabSubscriptionManager,
-  M as TabSubscriptionManagerClass,
+  tabGroupManagerInstance as tabGroupManager,
+  TabGroupManager as TabGroupManagerClass,
+  COMPUTER_CONTROL,
+  MCP,
+  getTabSubscriptionManagerInstance as getTabSubscriptionManager,
+  TabSubscriptionManager as TabSubscriptionManagerClass,
   setDomainCategoryCache,
 } from "./tab-group-manager.js";
-import { S as StorageKeys, d as getOrCreateAnonymousId } from "./storage.js";
+import { StorageKeys, getOrCreateAnonymousId } from "./storage.js";
 
 // Module imports
 import {
@@ -38,7 +38,8 @@ import {
   extractHostname,
 } from "./utils.js";
 
-import { DomainCategoryCache, W as domainCategoryCache } from "./domain-cache.js";
+import { DomainCategoryCache } from "./domain-cache.js";
+const domainCategoryCache = DomainCategoryCache;
 
 import { computerTool } from "./computer-tool.js";
 import { readPageTool, formInputTool, getPageTextTool, javascriptTool } from "./page-tools.js";
@@ -542,53 +543,53 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 // EXPORTS
 // ============================================================================
 
-// Main exports for service-worker.js (single-letter aliases for backward compatibility)
+// Main exports for service-worker.js
 export {
-  notifyDisconnection as L,
-  tabGroupManager as t,
-  createErrorResponse as M,
-  executeToolRequest as N,
+  notifyDisconnection,
+  tabGroupManager,
+  createErrorResponse,
+  executeToolRequest,
 };
 
-// Tool exports (single-letter aliases for backward compatibility)
+// Tool exports
 export {
-  gifCreatorTool as A,
-  domainCategoryCache as B,
-  turnAnswerStartTool as C,
-  javascriptTool as D,
-  coerceParameterTypes as E,
-  formatTabContextResponse as F,
-  filterAndApproveDomains as G,
-  getPlanModeReminder as H,
-  toAnthropicSchemas as I,
-  cdpDebugger as J,
-  findImageInMessages as K,
+  gifCreatorTool,
+  domainCategoryCache,
+  turnAnswerStartTool,
+  javascriptTool,
+  coerceParameterTypes,
+  formatTabContextResponse,
+  filterAndApproveDomains,
+  getPlanModeReminder,
+  toAnthropicSchemas,
+  cdpDebugger,
+  findImageInMessages,
 };
 
-// Helper exports (single-letter aliases for backward compatibility)
+// Helper exports
 export {
-  checkTabContext as a,
-  getOrCreateAnonymousId as b,
-  isRestrictedCategory as c,
-  getBlockedPageUrl as d,
-  checkDomainChange as e,
-  createDomainTransitionRequest as f,
-  getTabSubscriptionManager as g,
-  getFeatureFlags as h,
-  formInputTool as j,
-  computerTool as k,
-  navigateTool as l,
-  getPageTextTool as m,
-  shouldEnterPlanMode as n,
-  updatePlanTool as o,
-  parseArrayParam as p,
-  tabsCreateTool as q,
-  readPageTool as r,
-  stripSystemReminders as s,
-  updateBlocklistStatus as u,
-  tabsContextTool as v,
-  uploadImageTool as w,
-  readConsoleMessagesTool as x,
-  readNetworkRequestsTool as y,
-  resizeWindowTool as z,
+  checkTabContext,
+  getOrCreateAnonymousId,
+  isRestrictedCategory,
+  getBlockedPageUrl,
+  checkDomainChange,
+  createDomainTransitionRequest,
+  getTabSubscriptionManager,
+  getFeatureFlags,
+  formInputTool,
+  computerTool,
+  navigateTool,
+  getPageTextTool,
+  shouldEnterPlanMode,
+  updatePlanTool,
+  parseArrayParam,
+  tabsCreateTool,
+  readPageTool,
+  stripSystemReminders,
+  updateBlocklistStatus,
+  tabsContextTool,
+  uploadImageTool,
+  readConsoleMessagesTool,
+  readNetworkRequestsTool,
+  resizeWindowTool,
 };

@@ -315,8 +315,8 @@ class ScreenshotContextClass {
 
 const screenshotContext = new ScreenshotContextClass();
 
-// Export ScreenshotContext for use in mcp-tools.js (aliased as Q for backward compatibility)
-export { screenshotContext as Q };
+// Export ScreenshotContext for use in mcp-tools.js
+export { screenshotContext };
 
 // =============================================================================
 // Global CDP state initialization
@@ -1616,5 +1616,5 @@ class CDPDebugger {
 
 const cdpDebuggerInstance = new CDPDebugger();
 
-// Export with backward-compatible alias
-export { cdpDebuggerInstance as re };
+// Export CDP debugger instance
+export { cdpDebuggerInstance };

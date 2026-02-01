@@ -218,29 +218,3 @@ export interface AnalyticsInterface {
 export const Analytics: AnalyticsInterface = { track: () => {} };
 export const extensionId: string = chrome?.runtime?.id || "unknown";
 
-// =============================================================================
-// Backwards compatibility exports (aliased to match react-core.js exports)
-// =============================================================================
-
-export { StorageKeys as S };
-export { setStorageValue as s };
-export { getStorageValue as g };
-export { getEnvironmentConfig as h };
-export { generateScreenshotId as k };
-export { getOrCreateAnonymousId as d };
-export { dynamicImport as _ };
-export { handleLogout as H };
-export { handleOAuthRedirect as I };
-export { openSidePanelFromTab as o };
-export { SavedPromptsService as b };
-export { formatUserIdentity as K };
-export { getStoragePromise as z };
-export { captureViewportDimensions as w };
-export { SegmentConfig as A };
-export { getApiToken as x };
-export { AuthHelpers as B };
-export { SavedPromptsServiceInstance as y };
-export { OAuthConfig as C };
-export { Analytics as E };
-export { ToolPermissionType as T };
-export { extensionId as v };

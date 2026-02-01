@@ -7,8 +7,8 @@
  * - Se: getActionDelay helper
  */
 
-import { re as cdpDebugger } from "./cdp-debugger.js";
-import { K as TabGroupManager } from "./tab-group-manager.js";
+import { cdpDebuggerInstance as cdpDebugger } from "./cdp-debugger.js";
+import { tabGroupManagerInstance as TabGroupManager } from "./tab-group-manager.js";
 import { StorageKeys, ToolPermissionType } from "./storage.js";
 import { checkNavigationInterception } from "./utils.js";
 import type {
@@ -581,10 +581,3 @@ export const gifCreatorTool: ToolDefinition = {
   }),
 };
 
-// =============================================================================
-// Backward Compatibility Aliases
-// =============================================================================
-
-export { gifFrameStorage as xe };
-export { gifCreatorTool as Ce };
-export { getActionDelay as Se };

@@ -9,7 +9,7 @@
  * - tabs_create_mcp: MCP-specific tabs create
  */
 
-import { K as TabGroupManager } from "./tab-group-manager.js";
+import { tabGroupManagerInstance as TabGroupManager } from "./tab-group-manager.js";
 import { ToolPermissionType } from "./storage.js";
 import { DomainCategoryCache } from "./domain-cache.js";
 import { formatTabsResponse } from "./utils.js";
@@ -456,10 +456,3 @@ export const tabsCreateMcpTool: Tool<TabsCreateMcpParams> = {
   }),
 };
 
-// =============================================================================
-// Backward Compatibility Aliases
-// =============================================================================
-
-export { navigateTool as Y };
-export { tabsContextTool as me };
-export { tabsCreateTool as ge };

@@ -3,21 +3,22 @@
  *
  * This is the main entry point that orchestrates all MCP tool modules.
  *
- * EXPORTS for service-worker.js (keeping single-letter aliases for backward compatibility):
- *   L = notifyDisconnection
- *   t = tabGroupManager (K)
- *   M = createErrorResponse
- *   N = executeToolRequest
+ * Main exports for service-worker.js:
+ *   - notifyDisconnection
+ *   - tabGroupManager
+ *   - createErrorResponse
+ *   - executeToolRequest
  *
  * Additional exports for other modules.
  */
 // Core imports
-import { re as cdpDebugger, setTabGroupManager } from "./cdp-debugger.js";
-import { K as tabGroupManager, D as getTabSubscriptionManager, setDomainCategoryCache, } from "./tab-group-manager.js";
-import { d as getOrCreateAnonymousId } from "./storage.js";
+import { cdpDebuggerInstance as cdpDebugger, setTabGroupManager } from "./cdp-debugger.js";
+import { tabGroupManagerInstance as tabGroupManager, getTabSubscriptionManagerInstance as getTabSubscriptionManager, setDomainCategoryCache, } from "./tab-group-manager.js";
+import { getOrCreateAnonymousId } from "./storage.js";
 // Module imports
 import { isRestrictedUrl, formatTabContextResponse, stripSystemReminders, toAnthropicSchemas, coerceParameterTypes, parseArrayParam, findImageInMessages, } from "./utils.js";
-import { W as domainCategoryCache } from "./domain-cache.js";
+import { DomainCategoryCache } from "./domain-cache.js";
+const domainCategoryCache = DomainCategoryCache;
 import { computerTool } from "./computer-tool.js";
 import { readPageTool, formInputTool, getPageTextTool, javascriptTool } from "./page-tools.js";
 import { navigateTool, tabsContextTool, tabsCreateTool, } from "./navigation-tools.js";
@@ -374,9 +375,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 // ============================================================================
 // EXPORTS
 // ============================================================================
-// Main exports for service-worker.js (single-letter aliases for backward compatibility)
-export { notifyDisconnection as L, tabGroupManager as t, createErrorResponse as M, executeToolRequest as N, };
-// Tool exports (single-letter aliases for backward compatibility)
-export { gifCreatorTool as A, domainCategoryCache as B, turnAnswerStartTool as C, javascriptTool as D, coerceParameterTypes as E, formatTabContextResponse as F, filterAndApproveDomains as G, getPlanModeReminder as H, toAnthropicSchemas as I, cdpDebugger as J, findImageInMessages as K, };
-// Helper exports (single-letter aliases for backward compatibility)
-export { checkTabContext as a, getOrCreateAnonymousId as b, isRestrictedCategory as c, getBlockedPageUrl as d, checkDomainChange as e, createDomainTransitionRequest as f, getTabSubscriptionManager as g, getFeatureFlags as h, formInputTool as j, computerTool as k, navigateTool as l, getPageTextTool as m, shouldEnterPlanMode as n, updatePlanTool as o, parseArrayParam as p, tabsCreateTool as q, readPageTool as r, stripSystemReminders as s, updateBlocklistStatus as u, tabsContextTool as v, uploadImageTool as w, readConsoleMessagesTool as x, readNetworkRequestsTool as y, resizeWindowTool as z, };
+// Main exports for service-worker.js
+export { notifyDisconnection, tabGroupManager, createErrorResponse, executeToolRequest, };
+// Tool exports
+export { gifCreatorTool, domainCategoryCache, turnAnswerStartTool, javascriptTool, coerceParameterTypes, formatTabContextResponse, filterAndApproveDomains, getPlanModeReminder, toAnthropicSchemas, cdpDebugger, findImageInMessages, };
+// Helper exports
+export { checkTabContext, getOrCreateAnonymousId, isRestrictedCategory, getBlockedPageUrl, checkDomainChange, createDomainTransitionRequest, getTabSubscriptionManager, getFeatureFlags, formInputTool, computerTool, navigateTool, getPageTextTool, shouldEnterPlanMode, updatePlanTool, parseArrayParam, tabsCreateTool, readPageTool, stripSystemReminders, updateBlocklistStatus, tabsContextTool, uploadImageTool, readConsoleMessagesTool, readNetworkRequestsTool, resizeWindowTool, };

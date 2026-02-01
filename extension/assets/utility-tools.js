@@ -10,8 +10,8 @@
  * - shortcuts_list tool
  * - shortcuts_execute tool
  */
-import { re as cdpDebugger } from "./cdp-debugger.js";
-import { K as TabGroupManager } from "./tab-group-manager.js";
+import { cdpDebuggerInstance as cdpDebugger } from "./cdp-debugger.js";
+import { tabGroupManagerInstance as TabGroupManager } from "./tab-group-manager.js";
 import { ToolPermissionType, SavedPromptsService, setStorageValue, StorageKeys } from "./storage.js";
 import { findImageInMessages, checkNavigationInterception } from "./utils.js";
 // =============================================================================
@@ -860,11 +860,3 @@ export const shortcutsExecuteTool = {
         },
     }),
 };
-// =============================================================================
-// Aliases for Backward Compatibility
-// =============================================================================
-export { uploadImageTool as Te };
-export { readConsoleMessagesTool as ke };
-export { readNetworkRequestsTool as _e };
-export { resizeWindowTool as Ee };
-export { turnAnswerStartTool as Me };

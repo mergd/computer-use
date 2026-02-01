@@ -1,7 +1,7 @@
 /**
  * computer-tool.ts - Computer tool for browser automation
  *
- * Contains the main computer tool (ie) and helper functions:
+ * Contains the main computerTool and helper functions:
  * - scaleCoordinates: coordinate scaling
  * - scrollAtCoordinates: scroll helper
  * - getElementCoordinates: get element coordinates from ref
@@ -10,9 +10,9 @@
  * - getScrollPosition: get scroll position
  */
 
-import { re, Q } from "./cdp-debugger.js";
-import { K } from "./tab-group-manager.js";
-import { T as ToolTypes } from "./storage.js";
+import { cdpDebuggerInstance as cdpDebugger, screenshotContext } from "./cdp-debugger.js";
+import { tabGroupManagerInstance as TabGroupManager } from "./tab-group-manager.js";
+import { ToolPermissionType as ToolTypes } from "./storage.js";
 import { generateId, checkNavigationInterception } from "./utils.js";
 
 // =============================================================================
@@ -367,7 +367,7 @@ export async function handleClick(
       throw new Error("Either ref or coordinate parameter is required for click action");
     }
     [x, y] = params.coordinate;
-    const context = Q.getContext(tabId) as ScalingContext | undefined;
+    const context = screenshotContext.getContext(tabId) as ScalingContext | undefined;
     if (context) {
       [x, y] = scaleCoordinates(x, y, context);
     }
@@ -384,7 +384,7 @@ export async function handleClick(
     const navCheck = await checkNavigationInterception(tabId, originalUrl, "click action");
     if (navCheck) return navCheck;
 
-    await re.click(tabId, x, y, button, clickCount, modifiers);
+    await cdpDebugger.click(tabId, x, y, button, clickCount, modifiers);
 
     const clickType =
       clickCount === 1 ? "Clicked" :
@@ -405,7 +405,7 @@ export async function handleClick(
  */
 export async function captureScreenshot(tabId: number): Promise<ToolResult> {
   try {
-    const screenshotResult: ScreenshotResult = await re.screenshot(tabId);
+    const screenshotResult: ScreenshotResult = await cdpDebugger.screenshot(tabId);
     const imageId = generateId();
     console.info(`[Computer Tool] Generated screenshot ID: ${imageId}`);
     console.info(
@@ -509,7 +509,7 @@ async function handleType(
   try {
     const navCheck = await checkNavigationInterception(tabId, originalUrl, "type action");
     if (navCheck) return navCheck;
-    await re.type(tabId, params.text);
+    await cdpDebugger.type(tabId, params.text);
     return { output: `Typed "${params.text}"` };
   } catch (err) {
     return {
@@ -548,7 +548,7 @@ async function handleScroll(
   }
 
   let [x, y] = params.coordinate;
-  const context = Q.getContext(tabId) as ScalingContext | undefined;
+  const context = screenshotContext.getContext(tabId) as ScalingContext | undefined;
   if (context) {
     [x, y] = scaleCoordinates(x, y, context);
   }
@@ -574,7 +574,7 @@ async function handleScroll(
 
     if (tab.active ?? false) {
       try {
-        const cdpPromise = re.scrollWheel(tabId, x, y, deltaX, deltaY);
+        const cdpPromise = cdpDebugger.scrollWheel(tabId, x, y, deltaX, deltaY);
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error("Scroll timeout")), 5000);
         });
@@ -650,13 +650,13 @@ async function handleKey(
     for (let i = 0; i < repeat; i++) {
       for (const key of keyInputs) {
         if (key.includes("+")) {
-          await re.pressKeyChord(tabId, key);
+          await cdpDebugger.pressKeyChord(tabId, key);
         } else {
-          const keyCode = re.getKeyCode(key);
+          const keyCode = cdpDebugger.getKeyCode(key);
           if (keyCode) {
-            await re.pressKey(tabId, keyCode);
+            await cdpDebugger.pressKey(tabId, keyCode);
           } else {
-            await re.insertText(tabId, key);
+            await cdpDebugger.insertText(tabId, key);
           }
         }
       }
@@ -691,7 +691,7 @@ async function handleDrag(
   let [startX, startY] = params.start_coordinate;
   let [endX, endY] = params.coordinate;
 
-  const context = Q.getContext(tabId) as ScalingContext | undefined;
+  const context = screenshotContext.getContext(tabId) as ScalingContext | undefined;
   if (context) {
     [startX, startY] = scaleCoordinates(startX, startY, context);
     [endX, endY] = scaleCoordinates(endX, endY, context);
@@ -701,7 +701,7 @@ async function handleDrag(
     const navCheck = await checkNavigationInterception(tabId, originalUrl, "drag action");
     if (navCheck) return navCheck;
 
-    await re.dispatchMouseEvent(tabId, {
+    await cdpDebugger.dispatchMouseEvent(tabId, {
       type: "mouseMoved",
       x: startX,
       y: startY,
@@ -709,7 +709,7 @@ async function handleDrag(
       buttons: 0,
       modifiers: 0,
     } as MouseEventParams);
-    await re.dispatchMouseEvent(tabId, {
+    await cdpDebugger.dispatchMouseEvent(tabId, {
       type: "mousePressed",
       x: startX,
       y: startY,
@@ -718,7 +718,7 @@ async function handleDrag(
       clickCount: 1,
       modifiers: 0,
     } as MouseEventParams);
-    await re.dispatchMouseEvent(tabId, {
+    await cdpDebugger.dispatchMouseEvent(tabId, {
       type: "mouseMoved",
       x: endX,
       y: endY,
@@ -726,7 +726,7 @@ async function handleDrag(
       buttons: 1,
       modifiers: 0,
     } as MouseEventParams);
-    await re.dispatchMouseEvent(tabId, {
+    await cdpDebugger.dispatchMouseEvent(tabId, {
       type: "mouseReleased",
       x: endX,
       y: endY,
@@ -761,7 +761,7 @@ async function handleZoom(
   }
 
   try {
-    const context = Q.getContext(tabId) as ScalingContext | undefined;
+    const context = screenshotContext.getContext(tabId) as ScalingContext | undefined;
     if (context) {
       [x0, y0] = scaleCoordinates(x0, y0, context);
       [x1, y1] = scaleCoordinates(x1, y1, context);
@@ -789,7 +789,7 @@ async function handleZoom(
     const regionWidth = x1 - x0;
     const regionHeight = y1 - y0;
 
-    const screenshotData = await re.sendCommand(tabId, "Page.captureScreenshot", {
+    const screenshotData = await cdpDebugger.sendCommand(tabId, "Page.captureScreenshot", {
       format: "png",
       captureBeyondViewport: false,
       fromSurface: true,
@@ -861,7 +861,7 @@ async function handleHover(
       throw new Error("Either ref or coordinate parameter is required for hover action");
     }
     [x, y] = params.coordinate;
-    const context = Q.getContext(tabId) as ScalingContext | undefined;
+    const context = screenshotContext.getContext(tabId) as ScalingContext | undefined;
     if (context) {
       [x, y] = scaleCoordinates(x, y, context);
     }
@@ -871,7 +871,7 @@ async function handleHover(
     const navCheck = await checkNavigationInterception(tabId, originalUrl, "hover action");
     if (navCheck) return navCheck;
 
-    await re.dispatchMouseEvent(tabId, {
+    await cdpDebugger.dispatchMouseEvent(tabId, {
       type: "mouseMoved",
       x,
       y,
@@ -998,7 +998,7 @@ export const computerTool: ToolDefinition = {
       if (!args.action) throw new Error("Action parameter is required");
       if (!context?.tabId) throw new Error("No active tab found in context");
 
-      const effectiveTabId = await K.getEffectiveTabId(args.tabId, context.tabId);
+      const effectiveTabId = await TabGroupManager.getEffectiveTabId(args.tabId, context.tabId);
       const tab = await chrome.tabs.get(effectiveTabId);
       if (!tab.id) throw new Error("Active tab has no ID");
 
@@ -1022,7 +1022,7 @@ export const computerTool: ToolDefinition = {
             // Add screenshot for click actions
             if (["left_click", "right_click", "double_click", "triple_click"].includes(args.action)) {
               try {
-                const screenshot: ScreenshotResult = await re.screenshot(effectiveTabId);
+                const screenshot: ScreenshotResult = await cdpDebugger.screenshot(effectiveTabId);
                 result.actionData = {
                   screenshot: `data:image/${screenshot.format};base64,${screenshot.base64}`,
                 };
@@ -1102,7 +1102,7 @@ export const computerTool: ToolDefinition = {
           throw new Error(`Unsupported action: ${args.action}`);
       }
 
-      const tabsMetadata = await K.getValidTabsWithMetadata(context.tabId);
+      const tabsMetadata = await TabGroupManager.getValidTabsWithMetadata(context.tabId);
       return {
         ...result,
         tabContext: {
@@ -1211,5 +1211,3 @@ export const computerTool: ToolDefinition = {
   }),
 };
 
-// Alias for backward compatibility
-export { computerTool as ie };

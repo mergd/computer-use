@@ -1830,5 +1830,5 @@ class TabGroupManager {
 }
 // tabGroupManagerInstance = TabGroupManager singleton instance
 const tabGroupManagerInstance = TabGroupManager.getInstance();
-// Export with full names and backward-compatible single-letter aliases
-export { tabGroupManagerInstance, tabGroupManagerInstance as K, TabGroupManager, TabGroupManager as H, COMPUTER_CONTROL, COMPUTER_CONTROL as j, MCP, MCP as z, getTabSubscriptionManagerInstance, getTabSubscriptionManagerInstance as D, TabSubscriptionManager, TabSubscriptionManager as M, };
+// Export with full names only (single-letter aliases removed)
+export { tabGroupManagerInstance, TabGroupManager, COMPUTER_CONTROL, MCP, getTabSubscriptionManagerInstance, TabSubscriptionManager, };

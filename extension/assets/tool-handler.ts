@@ -2,14 +2,14 @@
  * tool-handler.ts - Tool execution engine
  *
  * Contains:
- * - ze: ToolCallHandler class
- * - We: tool registry array
- * - je: MCP-only tool names
- * - Vt: context factory
+ * - ToolCallHandler: Main tool execution handler class
+ * - toolRegistry: Registry of all available tools
+ * - mcpOnlyToolNames: Tool names that are MCP-only
+ * - getOrCreateToolHandler: Context factory for tool handlers
  */
 
-import { re } from "./cdp-debugger.js";
-import { K } from "./tab-group-manager.js";
+import { cdpDebuggerInstance as cdpDebugger } from "./cdp-debugger.js";
+import { tabGroupManagerInstance as TabGroupManager } from "./tab-group-manager.js";
 import { coerceParameterTypes } from "./utils.js";
 import { gifFrameStorage } from "./gif-tools.js";
 
@@ -378,7 +378,7 @@ export class ToolCallHandler {
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
 
       try {
-        screenshot = await re.screenshot(tabId);
+        screenshot = await cdpDebugger.screenshot(tabId);
       } catch {
         return;
       }
@@ -635,11 +635,3 @@ export function clearPendingError(): void {
   pendingErrorTimestamp = undefined;
 }
 
-// =============================================================================
-// Aliases for Backward Compatibility
-// =============================================================================
-
-export { ToolCallHandler as ze };
-export { toolRegistry as We };
-export { mcpOnlyToolNames as je };
-export { getOrCreateToolHandler as Vt };

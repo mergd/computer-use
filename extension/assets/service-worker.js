@@ -9,8 +9,8 @@
  * - Scheduled prompt/task execution
  * - OAuth and external message handling
  */
-import { s as setStorageValue, S as StorageKeys, h as getApiConfig, H as handleLogout, I as handleOAuthRedirect, b as SavedPromptsService, } from "./storage.js";
-import { L as notifyDisconnection, t as TabGroupManager, M as createErrorResponse, N as executeToolRequest, } from "./mcp-tools.js";
+import { setStorageValue, StorageKeys, getEnvironmentConfig, handleLogout, handleOAuthRedirect, SavedPromptsService, } from "./storage.js";
+import { notifyDisconnection, tabGroupManager as TabGroupManager, createErrorResponse, executeToolRequest, } from "./mcp-tools.js";
 /** Native messaging connection state */
 let nativePort = null;
 let isConnecting = false;
@@ -422,7 +422,7 @@ function sendToolResponse(response, clientId) {
  * Set up declarative net request rules for API requests
  */
 async function setupNetRequestRules() {
-    const apiConfig = getApiConfig();
+    const apiConfig = getEnvironmentConfig();
     const userAgent = `claude-browser-extension/${chrome.runtime.getManifest().version} (external) ${navigator.userAgent}`;
     const rules = [
         {

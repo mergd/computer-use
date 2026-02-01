@@ -4,7 +4,7 @@
  * DomainCategoryCache (W) - Caches domain category lookups from API
  * Used to check if domains are blocked or restricted
  */
-import { x as getApiToken } from "./storage.js";
+import { getApiToken } from "./storage.js";
 import { normalizeDomain, extractHostname } from "./utils.js";
 export class DomainCategoryCache {
     static cache = new Map();
@@ -72,5 +72,3 @@ export class DomainCategoryCache {
         return this.cache.size;
     }
 }
-// Alias for backward compatibility
-export { DomainCategoryCache as W };

@@ -8,8 +8,8 @@
  * - De: javascript_tool
  */
 
-import { re as cdpDebugger } from "./cdp-debugger.js";
-import { K as TabGroupManager } from "./tab-group-manager.js";
+import { cdpDebuggerInstance as cdpDebugger } from "./cdp-debugger.js";
+import { tabGroupManagerInstance as TabGroupManager } from "./tab-group-manager.js";
 import { ToolPermissionType } from "./storage.js";
 import { checkNavigationInterception } from "./utils.js";
 
@@ -995,11 +995,3 @@ export const javascriptTool: Tool<JavaScriptToolParams> = {
   }),
 };
 
-// =============================================================================
-// Aliases for backward compatibility
-// =============================================================================
-
-export { readPageTool as le };
-export { formInputTool as de };
-export { getPageTextTool as he };
-export { javascriptTool as De };

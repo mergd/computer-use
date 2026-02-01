@@ -6,7 +6,7 @@
  * - Ce: gif_creator tool
  * - Se: getActionDelay helper
  */
-import { K as TabGroupManager } from "./tab-group-manager.js";
+import { tabGroupManagerInstance as TabGroupManager } from "./tab-group-manager.js";
 import { StorageKeys, ToolPermissionType } from "./storage.js";
 import { checkNavigationInterception } from "./utils.js";
 // =============================================================================
@@ -433,9 +433,3 @@ export const gifCreatorTool = {
         },
     }),
 };
-// =============================================================================
-// Backward Compatibility Aliases
-// =============================================================================
-export { gifFrameStorage as xe };
-export { gifCreatorTool as Ce };
-export { getActionDelay as Se };
