@@ -1046,3 +1046,97 @@ export const shortcutsExecuteTool: ToolDefinition = {
   }),
 };
 
+// =============================================================================
+// Click 1Password Passkey Tool
+// =============================================================================
+
+/** Parameters for click_1password_passkey tool */
+interface Click1PasswordPasskeyParams {
+  tabId: number;
+  offsetX?: number;
+  offsetY?: number;
+}
+
+export const click1PasswordPasskeyTool: ToolDefinition = {
+  name: "click_1password_passkey",
+  description:
+    "Click on the 1Password passkey sign-in button that appears in the top-right corner of the browser viewport. The button is typically positioned 120px from the top-right corner. Use this when Google or other sites prompt for passkey authentication and 1Password shows its sign-in popup.",
+  parameters: {
+    tabId: {
+      type: "number",
+      description: "Tab ID where the 1Password passkey popup is showing.",
+    },
+    offsetX: {
+      type: "number",
+      description: "Horizontal offset from the right edge of viewport in pixels. Defaults to 120.",
+    },
+    offsetY: {
+      type: "number",
+      description: "Vertical offset from the top edge of viewport in pixels. Defaults to 120.",
+    },
+  },
+  execute: async (params: Record<string, unknown>, context: ToolExecutionContext): Promise<ToolResult> => {
+    try {
+      const { tabId, offsetX = 120, offsetY = 120 } = params as unknown as Click1PasswordPasskeyParams;
+
+      if (!tabId) throw new Error("tabId parameter is required");
+
+      const effectiveTabId = await TabGroupManager.getEffectiveTabId(tabId, context.tabId);
+
+      // Get viewport dimensions from the tab
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: effectiveTabId },
+        func: () => ({
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }),
+      });
+
+      if (!result?.result) {
+        throw new Error("Failed to get viewport dimensions");
+      }
+
+      const viewport = result.result as { width: number; height: number };
+      const clickX = viewport.width - offsetX;
+      const clickY = offsetY;
+
+      // Ensure debugger is attached
+      await cdpDebugger.attachDebugger(effectiveTabId);
+
+      // Click at the calculated position
+      await cdpDebugger.click(effectiveTabId, clickX, clickY, "left", 1);
+
+      return {
+        output: `Clicked 1Password passkey button at (${clickX}, ${clickY}) - viewport: ${viewport.width}x${viewport.height}, offset: (${offsetX}, ${offsetY}) from top-right`,
+      };
+    } catch (err) {
+      return {
+        error: `Failed to click 1Password passkey: ${err instanceof Error ? err.message : "Unknown error"}`,
+      };
+    }
+  },
+  toAnthropicSchema: async (): Promise<AnthropicToolSchema> => ({
+    name: "click_1password_passkey",
+    description:
+      "Click on the 1Password passkey sign-in button that appears in the top-right corner of the browser viewport. The button is typically positioned 120px from the top-right corner. Use this when Google or other sites prompt for passkey authentication and 1Password shows its sign-in popup.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tabId: {
+          type: "number",
+          description: "Tab ID where the 1Password passkey popup is showing.",
+        },
+        offsetX: {
+          type: "number",
+          description: "Horizontal offset from the right edge of viewport in pixels. Defaults to 120.",
+        },
+        offsetY: {
+          type: "number",
+          description: "Vertical offset from the top edge of viewport in pixels. Defaults to 120.",
+        },
+      },
+      required: ["tabId"],
+    },
+  }),
+};
+

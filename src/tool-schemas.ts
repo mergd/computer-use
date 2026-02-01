@@ -318,6 +318,16 @@ export function registerBrowserTools(
     const result = await execTool("search_history", args);
     return formatResult(result);
   });
+
+  // 1Password passkey tool
+  server.tool("click_1password_passkey", "Click 1Password passkey sign-in button in top-right corner", {
+    tabId: z.number().describe("Tab ID where the 1Password passkey popup is showing"),
+    offsetX: z.number().optional().describe("Horizontal offset from right edge (default: 120)"),
+    offsetY: z.number().optional().describe("Vertical offset from top edge (default: 120)"),
+  }, async (args) => {
+    const result = await execTool("click_1password_passkey", args);
+    return formatResult(result);
+  });
 }
 
 // ---------------------------------------------------------------------------

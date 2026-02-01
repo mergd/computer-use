@@ -67,6 +67,7 @@ import {
   turnAnswerStartTool,
   shortcutsListTool,
   shortcutsExecuteTool,
+  click1PasswordPasskeyTool,
 } from "./utility-tools.js";
 import {
   ToolCallHandler,

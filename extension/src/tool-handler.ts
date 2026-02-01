@@ -27,6 +27,7 @@ import {
   turnAnswerStartTool,
   shortcutsListTool,
   shortcutsExecuteTool,
+  click1PasswordPasskeyTool,
 } from "./utility-tools.js";
 
 // Import types
@@ -190,6 +191,7 @@ export const toolRegistry: ToolDefinition[] = [
   javascriptTool,
   shortcutsListTool,
   shortcutsExecuteTool,
+  click1PasswordPasskeyTool,
 ];
 
 /**
