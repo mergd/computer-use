@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "computer-control-browser": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["src/cli.ts", "browser", "serve", "--skip-permissions"]
+    },
+    "computer-control-mac": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["src/cli.ts", "mac", "serve"]
+    }
+  }
+}

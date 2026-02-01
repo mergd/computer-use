@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 /**
- * browser-mcp CLI
+ * computer-control CLI
  *
- * Commands:
- *   install   Interactive setup wizard
- *   status    Show installation status
- *   path      Print extension directory
- *   serve     Start MCP server (stdio)
+ * Browser Mode (requires Chrome extension):
+ *   computer-control browser install   Setup Chrome extension
+ *   computer-control browser status    Show installation status
+ *   computer-control browser serve     Start browser MCP server
+ *
+ * Mac Mode (native macOS control):
+ *   computer-control mac setup         Setup macOS automation
+ *   computer-control mac serve         Start macOS MCP server
  */
 
 import { Command } from "commander";
 import readline from "node:readline";
-import { extensionDir, install, manifestPath, readExtensionId, stateDir, uninstall } from "./install.js";
+import { extensionDir, install, manifestPath, readExtensionId, uninstall } from "./install.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,24 +41,32 @@ function step(n: number, total: number, msg: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Commands
+// Main Program
 // ---------------------------------------------------------------------------
 
 const program = new Command()
-  .name("browser-mcp")
-  .description("Browser automation MCP server — accessibility tree, element interaction, and CDP relay.")
+  .name("computer-control")
+  .description("Computer control MCP server — browser automation + macOS desktop control")
   .version("0.1.0");
 
-// ---- install --------------------------------------------------------------
+// ===========================================================================
+// BROWSER MODE
+// ===========================================================================
 
-program
+const browser = program
+  .command("browser")
+  .description("Browser automation via Chrome extension");
+
+// ---- browser install ------------------------------------------------------
+
+browser
   .command("install")
-  .description("Interactive setup wizard")
+  .description("Interactive setup wizard for Chrome extension")
   .option("--extension-id <id>", "Skip ID prompt (32 lowercase letters)")
   .action(async (opts) => {
     out(`
-${BOLD}${MAGENTA}browser-mcp setup${RESET}
-${DIM}Accessibility tree + browser automation for AI agents${RESET}`);
+${BOLD}${MAGENTA}computer-control browser setup${RESET}
+${DIM}Browser automation via Chrome extension${RESET}`);
 
     const existingId = readExtensionId();
     if (existingId) {
@@ -107,26 +118,25 @@ ${GREEN}${BOLD}Done!${RESET}
 ${BOLD}Next:${RESET}
   1. ${BOLD}Restart Chrome${RESET} (quit fully, then reopen)
   2. Click the extension icon on any tab — badge shows ${GREEN}ON${RESET}
-  3. Run ${CYAN}browser-mcp serve${RESET} to start the MCP server
+  3. Run ${CYAN}computer-control browser serve${RESET} to start the MCP server
 
-${BOLD}Cursor / Claude Code:${RESET}
-  Add to your MCP config:
+${BOLD}Claude Code / Cursor MCP config:${RESET}
   ${DIM}{
     "mcpServers": {
       "browser": {
-        "command": "browser-mcp",
-        "args": ["serve"]
+        "command": "computer-control",
+        "args": ["browser", "serve"]
       }
     }
   }${RESET}
 `);
   });
 
-// ---- status ---------------------------------------------------------------
+// ---- browser status -------------------------------------------------------
 
-program
+browser
   .command("status")
-  .description("Check installation status")
+  .description("Check Chrome extension installation status")
   .option("--json", "Output JSON")
   .action(async (opts) => {
     const mp = manifestPath();
@@ -138,7 +148,7 @@ program
       return;
     }
 
-    out(`${BOLD}browser-mcp status${RESET}\n`);
+    out(`${BOLD}computer-control browser status${RESET}\n`);
 
     const fs = await import("node:fs");
     if (fs.existsSync(mp)) {
@@ -157,51 +167,33 @@ program
     out(`\n${DIM}Extension source: ${extDir}${RESET}`);
 
     if (!fs.existsSync(mp)) {
-      out(`\nRun: ${CYAN}browser-mcp install${RESET}`);
+      out(`\nRun: ${CYAN}computer-control browser install${RESET}`);
     }
   });
 
-// ---- path -----------------------------------------------------------------
+// ---- browser path ---------------------------------------------------------
 
-program
+browser
   .command("path")
   .description("Print extension directory (for Load unpacked)")
   .action(() => out(extensionDir()));
 
-// ---- serve ----------------------------------------------------------------
+// ---- browser serve --------------------------------------------------------
 
-program
+browser
   .command("serve")
-  .description("Start MCP server (stdio) — connects to Chrome extension via native messaging")
+  .description("Start browser MCP server (connects to Chrome extension)")
   .option("--skip-permissions", "Bypass extension permission prompts for all domains")
   .action(async (opts) => {
-    const { BrowserHost } = await import("./host.js");
-    const log = (msg: string) => process.stderr.write(`[browser-mcp] ${msg}\n`);
-
-    const host = new BrowserHost(process.stdin, process.stdout, log, {
+    const { startMcpServer } = await import("./mcp-server.js");
+    await startMcpServer({
       skipPermissions: !!opts.skipPermissions,
     });
-
-    if (opts.skipPermissions) {
-      log("Permission bypass enabled — all domains auto-approved");
-    }
-
-    host.on("connected", () => {
-      log("Extension connected — MCP server ready");
-    });
-
-    host.on("disconnected", () => {
-      log("Extension disconnected");
-      process.exit(0);
-    });
-
-    host.start();
-    log("Waiting for Chrome extension connection…");
   });
 
-// ---- uninstall ------------------------------------------------------------
+// ---- browser uninstall ----------------------------------------------------
 
-program
+browser
   .command("uninstall")
   .description("Remove native messaging host registration")
   .action(() => {
@@ -209,6 +201,215 @@ program
       out(`${GREEN}✓${RESET} Native host unregistered.`);
     } else {
       out(`${DIM}Nothing to uninstall.${RESET}`);
+    }
+  });
+
+// ===========================================================================
+// MAC MODE
+// ===========================================================================
+
+const mac = program
+  .command("mac")
+  .description("macOS desktop automation (no Chrome needed)");
+
+// ---- mac setup ------------------------------------------------------------
+
+mac
+  .command("setup")
+  .description("Interactive setup wizard for macOS desktop automation")
+  .action(async () => {
+    const { execSync } = await import("node:child_process");
+
+    out(`
+${BOLD}${MAGENTA}computer-control mac setup${RESET}
+${DIM}macOS desktop automation for AI agents${RESET}
+`);
+
+    const total = 4;
+
+    // Step 1 — Check/install cliclick
+    step(1, total, "Checking cliclick (mouse/keyboard control)");
+    let hasCliclick = false;
+    try {
+      execSync("which cliclick", { stdio: "ignore" });
+      hasCliclick = true;
+      out(`  ${GREEN}✓${RESET} cliclick is installed`);
+    } catch {
+      out(`  ${YELLOW}!${RESET} cliclick not found`);
+      const ans = await ask(`  Install via Homebrew? [Y/n] `);
+      if (!ans.toLowerCase().startsWith("n")) {
+        out(`  ${DIM}Running: brew install cliclick${RESET}`);
+        try {
+          execSync("brew install cliclick", { stdio: "inherit" });
+          hasCliclick = true;
+          out(`  ${GREEN}✓${RESET} cliclick installed`);
+        } catch {
+          out(`  ${RED}✗${RESET} Failed to install. Run manually: brew install cliclick`);
+        }
+      }
+    }
+
+    // Step 2 — Check/install gifsicle (for GIF recording - lightweight ~1MB)
+    step(2, total, "Checking gifsicle (GIF recording)");
+    let hasGifsicle = false;
+    try {
+      execSync("which gifsicle", { stdio: "ignore" });
+      hasGifsicle = true;
+      out(`  ${GREEN}✓${RESET} gifsicle is installed`);
+    } catch {
+      out(`  ${YELLOW}!${RESET} gifsicle not found (optional, for GIF recording, ~1MB)`);
+      const ans = await ask(`  Install via Homebrew? [Y/n] `);
+      if (!ans.toLowerCase().startsWith("n")) {
+        out(`  ${DIM}Running: brew install gifsicle${RESET}`);
+        try {
+          execSync("brew install gifsicle", { stdio: "inherit" });
+          hasGifsicle = true;
+          out(`  ${GREEN}✓${RESET} gifsicle installed`);
+        } catch {
+          out(`  ${RED}✗${RESET} Failed to install. Run manually: brew install gifsicle`);
+        }
+      }
+    }
+
+    // Step 3 — macOS permissions
+    step(3, total, "macOS permissions");
+    out(`
+  For full desktop control, grant these permissions in:
+  ${CYAN}System Settings → Privacy & Security${RESET}
+
+  ${BOLD}Accessibility${RESET} (required for mouse/keyboard):
+    Add your terminal app (Terminal, iTerm, Warp, etc.)
+
+  ${BOLD}Screen Recording${RESET} (required for screenshots):
+    Add your terminal app
+`);
+    out(`  ${DIM}Open System Settings now?${RESET}`);
+    const openSettings = await ask(`  [Y/n] `);
+    if (!openSettings.toLowerCase().startsWith("n")) {
+      execSync("open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'");
+      await ask(`  ${DIM}Press Enter when you've added your terminal to Accessibility…${RESET} `);
+      execSync("open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'");
+      await ask(`  ${DIM}Press Enter when you've added your terminal to Screen Recording…${RESET} `);
+    }
+
+    // Step 4 — Test
+    step(4, total, "Testing desktop control");
+    if (hasCliclick) {
+      try {
+        const result = execSync("cliclick p:.", { encoding: "utf-8" }).trim();
+        out(`  ${GREEN}✓${RESET} Mouse position: ${result}`);
+      } catch {
+        out(`  ${YELLOW}!${RESET} Could not get mouse position — check Accessibility permissions`);
+      }
+    }
+
+    try {
+      execSync("screencapture -x /tmp/test-screenshot.png", { stdio: "ignore" });
+      const fs = await import("node:fs");
+      if (fs.existsSync("/tmp/test-screenshot.png")) {
+        fs.unlinkSync("/tmp/test-screenshot.png");
+        out(`  ${GREEN}✓${RESET} Screenshot capture works`);
+      }
+    } catch {
+      out(`  ${YELLOW}!${RESET} Screenshot failed — check Screen Recording permissions`);
+    }
+
+    // Done
+    out(`
+${GREEN}${BOLD}Setup complete!${RESET}
+
+${BOLD}To start the MCP server:${RESET}
+  ${CYAN}computer-control mac serve${RESET}
+
+${BOLD}Claude Code / Cursor MCP config:${RESET}
+  ${DIM}{
+    "mcpServers": {
+      "mac": {
+        "command": "computer-control",
+        "args": ["mac", "serve"]
+      }
+    }
+  }${RESET}
+
+${BOLD}Available tools:${RESET}
+  ${DIM}screenshot, mouse_click, mouse_move, mouse_scroll, mouse_drag
+  type_text, key_press, get_cursor_position, get_screen_size
+  run_applescript, get_active_window, list_windows, focus_app
+  get_accessibility_tree, ocr_screen, find_text${RESET}
+  ${hasGifsicle ? `${DIM}gif_start, gif_stop, gif_export${RESET}` : `${YELLOW}(GIF tools need: brew install gifsicle)${RESET}`}
+`);
+  });
+
+// ---- mac serve ------------------------------------------------------------
+
+mac
+  .command("serve")
+  .description("Start macOS desktop MCP server")
+  .option("--no-notify", "Disable macOS notifications (enabled by default)")
+  .action(async (opts) => {
+    const { startDesktopServer } = await import("./desktop-server.js");
+    await startDesktopServer({ notify: opts.notify !== false });
+  });
+
+// ---- mac status -----------------------------------------------------------
+
+mac
+  .command("status")
+  .description("Check macOS automation dependencies and permissions")
+  .action(async () => {
+    const { execSync } = await import("node:child_process");
+    const { checkPermissions, detectTerminal } = await import("./desktop-tools.js");
+
+    out(`${BOLD}computer-control mac status${RESET}\n`);
+
+    // Show terminal
+    const terminal = detectTerminal();
+    out(`${BOLD}Terminal:${RESET} ${terminal}\n`);
+
+    // Check dependencies
+    out(`${BOLD}Dependencies:${RESET}`);
+    try {
+      execSync("which cliclick", { stdio: "ignore" });
+      out(`  ${GREEN}✓${RESET} cliclick`);
+    } catch {
+      out(`  ${RED}✗${RESET} cliclick ${DIM}(brew install cliclick)${RESET}`);
+    }
+
+    try {
+      execSync("which gifsicle", { stdio: "ignore" });
+      out(`  ${GREEN}✓${RESET} gifsicle`);
+    } catch {
+      out(`  ${YELLOW}?${RESET} gifsicle ${DIM}(optional: brew install gifsicle)${RESET}`);
+    }
+
+    // Check permissions
+    out(`\n${BOLD}Permissions for ${terminal}:${RESET}`);
+    const perms = checkPermissions();
+
+    if (perms.accessibility) {
+      out(`  ${GREEN}✓${RESET} Accessibility`);
+    } else {
+      out(`  ${RED}✗${RESET} Accessibility ${DIM}→ System Settings → Privacy & Security → Accessibility${RESET}`);
+    }
+
+    if (perms.screenRecording) {
+      out(`  ${GREEN}✓${RESET} Screen Recording`);
+    } else {
+      out(`  ${RED}✗${RESET} Screen Recording ${DIM}→ System Settings → Privacy & Security → Screen Recording${RESET}`);
+    }
+
+    if (perms.automation) {
+      out(`  ${GREEN}✓${RESET} Automation (System Events)`);
+    } else {
+      out(`  ${RED}✗${RESET} Automation ${DIM}→ System Settings → Privacy & Security → Automation${RESET}`);
+    }
+
+    const allOk = perms.accessibility && perms.screenRecording && perms.automation;
+    if (!allOk) {
+      out(`\n${YELLOW}⚠${RESET}  Add ${BOLD}${terminal}${RESET} to the permissions above`);
+      out(`${DIM}Run 'computer-control mac setup' for guided setup${RESET}`);
+    } else {
+      out(`\n${GREEN}✓${RESET} All permissions granted for ${BOLD}${terminal}${RESET}`);
     }
   });
 

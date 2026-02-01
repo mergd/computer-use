@@ -1,10 +1,10 @@
 {
-  "name": "browser-mcp",
+  "name": "computer-control",
   "version": "0.1.0",
-  "description": "Browser automation MCP server — accessibility tree, element interaction, and raw CDP via a Chrome extension relay.",
+  "description": "Computer control MCP server — browser automation via Chrome extension, macOS desktop control via native tools.",
   "type": "module",
   "bin": {
-    "browser-mcp": "./dist/cli.js"
+    "computer-control": "./dist/cli.js"
   },
   "scripts": {
     "dev": "bun src/cli.ts",
@@ -18,8 +18,10 @@
     "@types/ws": "^8.5.0"
   },
   "dependencies": {
-    "commander": "^13.0.0",
-    "ws": "^8.18.0"
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "commander": "^14.0.3",
+    "ws": "^8.19.0",
+    "zod": "^3"
   },
   "engines": {
     "node": ">=22"

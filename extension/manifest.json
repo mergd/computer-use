@@ -1,6 +1,6 @@
 {
    "action": {
-      "default_title": "browser-mcp"
+      "default_title": "Computer Control"
    },
    "background": {
       "service_worker": "service-worker-loader.js",
@@ -8,7 +8,7 @@
    },
    "commands": {
       "toggle-side-panel": {
-         "description": "Toggle browser-mcp side panel",
+         "description": "Toggle Computer Control side panel",
          "suggested_key": {
             "default": "Ctrl+Shift+E",
             "mac": "Command+Shift+E"
@@ -29,15 +29,15 @@
    "content_security_policy": {
       "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
    },
-   "description": "browser-mcp: Browser automation for AI agents",
+   "description": "Computer Control: Browser automation for AI agents via MCP",
    "host_permissions": [ "\u003Call_urls>" ],
    "icons": {
       "128": "icon-128.png"
    },
    "manifest_version": 3,
-   "name": "browser-mcp",
+   "name": "Computer Control",
    "options_page": "options.html",
-   "permissions": [ "sidePanel", "storage", "activeTab", "scripting", "debugger", "tabGroups", "tabs", "alarms", "notifications", "system.display", "webNavigation", "declarativeNetRequestWithHostAccess", "offscreen", "nativeMessaging", "unlimitedStorage", "downloads" ],
+   "permissions": [ "sidePanel", "storage", "activeTab", "scripting", "debugger", "tabGroups", "tabs", "alarms", "notifications", "system.display", "webNavigation", "declarativeNetRequestWithHostAccess", "nativeMessaging", "unlimitedStorage", "downloads" ],
    "version": "0.1.0",
    "web_accessible_resources": [ {
       "matches": [ "\u003Call_urls>" ],

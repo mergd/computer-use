@@ -1,40 +1,143 @@
 <!doctype html>
-<html lang="en" data-theme="claude">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icon-128.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Claude Options</title>
-    <script>
-      // Set initial theme mode based on system preference
-      (function () {
-        const isDark = window.matchMedia(
-          "(prefers-color-scheme: dark)",
-        ).matches;
-        document.documentElement.setAttribute(
-          "data-mode",
-          isDark ? "dark" : "light",
-        );
-        // Listen for system theme changes
-        window
-          .matchMedia("(prefers-color-scheme: dark)")
-          .addEventListener("change", (e) => {
-            document.documentElement.setAttribute(
-              "data-mode",
-              e.matches ? "dark" : "light",
-            );
-          });
-      })();
-    </script>
-    <script type="module" crossorigin src="/assets/options.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/react-core.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-framework.js">
-    <link rel="modulepreload" crossorigin href="/assets/sentry-noop.js">
-    <link rel="modulepreload" crossorigin href="/assets/datadog-noop.js">
-    <link rel="modulepreload" crossorigin href="/assets/tasks-tab.js">
-    <link rel="stylesheet" crossorigin href="/assets/ui-framework.css">
+    <title>Computer Control Options</title>
+    <style>
+      :root {
+        --bg-primary: #fafaf9;
+        --bg-secondary: #f5f5f4;
+        --text-primary: #1c1917;
+        --text-secondary: #57534e;
+        --border: #e7e5e4;
+        --success: #22c55e;
+        --warning: #eab308;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-primary: #1c1917;
+          --bg-secondary: #292524;
+          --text-primary: #fafaf9;
+          --text-secondary: #a8a29e;
+          --border: #44403c;
+        }
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        padding: 48px;
+        min-height: 100vh;
+      }
+      .container { max-width: 600px; margin: 0 auto; }
+      h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+      .subtitle { color: var(--text-secondary); font-size: 16px; margin-bottom: 32px; }
+      .card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+      }
+      .card h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+      .status-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .status-row:last-child { border-bottom: none; }
+      .status-label { font-size: 14px; color: var(--text-secondary); }
+      .status-value { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
+      .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+      .status-dot.connected { background: var(--success); }
+      .status-dot.disconnected { background: var(--warning); }
+      .info { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+      code {
+        background: var(--bg-primary);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+      pre {
+        background: var(--bg-primary);
+        padding: 16px;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin-top: 12px;
+      }
+      pre code { padding: 0; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div class="container">
+      <h1>Computer Control</h1>
+      <p class="subtitle">Browser automation via MCP</p>
+
+      <div class="card">
+        <h2>Connection Status</h2>
+        <div class="status-row">
+          <span class="status-label">Native Host</span>
+          <span class="status-value">
+            <span class="status-dot" id="native-dot"></span>
+            <span id="native-status">Checking...</span>
+          </span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">MCP Server</span>
+          <span class="status-value">
+            <span class="status-dot" id="mcp-dot"></span>
+            <span id="mcp-status">Checking...</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Usage</h2>
+        <p class="info">Start the MCP server to enable browser automation:</p>
+        <pre><code>computer-control browser serve</code></pre>
+        <p class="info" style="margin-top: 16px;">
+          Configure your MCP client to connect to this extension. The extension provides
+          browser automation tools like navigation, clicking, typing, and screenshots.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Version</h2>
+        <p class="info" id="version">Loading...</p>
+      </div>
+    </div>
+
+    <script>
+      function updateStatus() {
+        chrome.runtime.sendMessage({ type: 'check_native_host_status' }, (response) => {
+          const nativeDot = document.getElementById('native-dot');
+          const nativeStatus = document.getElementById('native-status');
+          const mcpDot = document.getElementById('mcp-dot');
+          const mcpStatus = document.getElementById('mcp-status');
+
+          if (response?.status) {
+            const { nativeHostInstalled, mcpConnected } = response.status;
+            nativeDot.className = 'status-dot ' + (nativeHostInstalled ? 'connected' : 'disconnected');
+            nativeStatus.textContent = nativeHostInstalled ? 'Connected' : 'Not Found';
+            mcpDot.className = 'status-dot ' + (mcpConnected ? 'connected' : 'disconnected');
+            mcpStatus.textContent = mcpConnected ? 'Connected' : 'Waiting...';
+          } else {
+            nativeDot.className = 'status-dot disconnected';
+            nativeStatus.textContent = 'Unknown';
+            mcpDot.className = 'status-dot disconnected';
+            mcpStatus.textContent = 'Unknown';
+          }
+        });
+      }
+
+      document.getElementById('version').textContent = 'v' + chrome.runtime.getManifest().version;
+      updateStatus();
+      setInterval(updateStatus, 5000);
+    </script>
   </body>
 </html>
