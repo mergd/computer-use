@@ -1,25 +1,34 @@
+/**
+ * agent-visual-indicator.ts - Visual indicators for Claude browser automation
+ *
+ * This module provides visual feedback when Claude is actively controlling a browser tab.
+ * It creates:
+ * 1. A pulsing glow border around the viewport during tool execution
+ * 2. A static indicator bar showing "Claude is active in this tab group"
+ */
+// =============================================================================
+// Implementation
+// =============================================================================
 (function () {
-  !(function () {
-    // State variables for managing visual indicators
-    let glowBorderElement = null;
-    let staticIndicatorContainer = null;
-    let isAgentIndicatorActive = false;
-    let isStaticIndicatorActive = false;
-    let wasAgentIndicatorVisible = false;
-    let wasStaticIndicatorVisible = false;
-    let heartbeatIntervalId = null;
-
-    /**
-     * Injects the CSS keyframes animation for the pulsing glow effect
-     */
-    function injectAnimationStyles() {
-      if (document.getElementById("claude-agent-animation-styles")) {
-        return;
-      }
-
-      const styleElement = document.createElement("style");
-      styleElement.id = "claude-agent-animation-styles";
-      styleElement.textContent = `
+    (function () {
+        // State variables for managing visual indicators
+        let glowBorderElement = null;
+        let staticIndicatorContainer = null;
+        let isAgentIndicatorActive = false;
+        let isStaticIndicatorActive = false;
+        let wasAgentIndicatorVisible = false;
+        let wasStaticIndicatorVisible = false;
+        let heartbeatIntervalId = null;
+        /**
+         * Injects the CSS keyframes animation for the pulsing glow effect
+         */
+        function injectAnimationStyles() {
+            if (document.getElementById("claude-agent-animation-styles")) {
+                return;
+            }
+            const styleElement = document.createElement("style");
+            styleElement.id = "claude-agent-animation-styles";
+            styleElement.textContent = `
       @keyframes claude-pulse {
         0% {
           box-shadow:
@@ -41,16 +50,15 @@
         }
       }
     `;
-      document.head.appendChild(styleElement);
-    }
-
-    /**
-     * Creates the pulsing glow border element that appears around the viewport
-     */
-    function createGlowBorderElement() {
-      const element = document.createElement("div");
-      element.id = "claude-agent-glow-border";
-      element.style.cssText = `
+            document.head.appendChild(styleElement);
+        }
+        /**
+         * Creates the pulsing glow border element that appears around the viewport
+         */
+        function createGlowBorderElement() {
+            const element = document.createElement("div");
+            element.id = "claude-agent-glow-border";
+            element.style.cssText = `
       position: fixed;
       top: 0;
       left: 0;
@@ -66,16 +74,15 @@
         inset 0 0 20px rgba(59, 130, 246, 0.3),
         inset 0 0 30px rgba(59, 130, 246, 0.1);
     `;
-      return element;
-    }
-
-    /**
-     * Creates the static indicator that shows "Claude is active in this tab group"
-     */
-    function createStaticIndicatorContainer() {
-      const container = document.createElement("div");
-      container.id = "claude-static-indicator-container";
-      container.innerHTML = `
+            return element;
+        }
+        /**
+         * Creates the static indicator that shows "Claude is active in this tab group"
+         */
+        function createStaticIndicatorContainer() {
+            const container = document.createElement("div");
+            container.id = "claude-static-indicator-container";
+            container.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; flex-shrink: 0; margin-right: 8px;">
         <path d="M3.13946 10.6399L6.28757 8.87462L6.37405 8.73821L6.28757 8.6339H6.13189L5.60432 8.6018L3.80541 8.55366L2.24865 8.48947L0.735135 8.40923H0.492973L0.354595 8.32899L0.181622 8.1685L0.0345946 8.01605L0 7.85557L0.0345946 7.62287L0.138378 7.44634L0.224865 7.40622H0.354595L0.812973 7.44634L1.82486 7.51856L3.34703 7.62287L4.44541 7.68706L6.08 7.85557H6.33946L6.37405 7.75125L6.28757 7.68706L6.21838 7.62287L4.64432 6.55567L2.94054 5.4323L2.04973 4.78235L1.57405 4.45336L1.33189 4.14845L1.22811 3.92377L1.17622 3.69107L1.22811 3.47442L1.33189 3.28185L1.46162 3.13741L1.66054 2.99298H1.87676L2.24865 3.0331L2.39568 3.07322L2.99243 3.53059L4.26378 4.51755L5.92432 5.73721L6.16649 5.93781H6.27892V5.82548L6.16649 5.64092L5.26703 4.01204L4.30703 2.35105L3.87459 1.66098L3.76216 1.25176C3.7391 1.16082 3.69297 0.977332 3.69297 0.970913V0.762287L3.77946 0.505517L3.93513 0.240722L4.18595 0.0882648L4.4627 0H4.67892L4.83459 0.0240722L5.12865 0.0882648L5.4054 0.328987L5.82054 1.27583L6.48649 2.76028L7.52432 4.78235L7.82703 5.38415L7.99135 5.93781L8.05189 6.10632H8.15567V6.01003L8.24216 4.87061L8.39784 3.47442L8.55351 1.67703L8.6054 1.17151L8.85622 0.561685L8.9773 0.417252L9.21946 0.232698H9.35784L9.74703 0.417252L9.97189 0.665998L10.067 0.874624L10.0238 1.17151L9.83351 2.40722L9.46162 4.34102L9.21946 5.64092H9.35784L9.52216 5.47242L10.1795 4.60582L11.2778 3.22568L11.7622 2.68004L12.333 2.07823L12.6962 1.78937L13.0162 1.67703L13.3881 1.78937L13.7168 2.06219L13.8897 2.54363V2.76028L13.6649 3.32197L12.9557 4.22066L12.3676 4.98295L12.0043 5.56871L11.0011 7.02106V7.08526H11.1741L13.0768 6.67603L14.1059 6.49147L15.3341 6.28285L15.5762 6.34704L15.8876 6.53962L15.9481 6.80441L15.8876 7.12538L15.7319 7.34203L14.4173 7.66299L12.8778 7.97593L10.5854 8.51559C10.5705 8.51909 10.56 8.53236 10.56 8.54764C10.56 8.56468 10.573 8.57891 10.59 8.58044L11.6238 8.67402L12.0649 8.69809H13.1459L15.1611 8.85055L15.6886 9.19559L15.9481 9.39619L16 9.62086L15.9481 9.94985L15.8443 10.1023L15.4119 10.3029L15.1351 10.3591L14.0454 10.1023L11.4941 9.49248L10.6205 9.27583H10.4995V9.34804L11.2259 10.0622L12.5665 11.2658L14.2357 12.8225L14.3222 13.0953V13.2076L14.1059 13.5125L13.9243 13.5206L13.8811 13.4804L12.4108 12.3731L12.2984 12.325L11.84 11.8756L10.56 10.7924H10.4735V10.9047L10.7676 11.338L12.333 13.6891L12.4108 14.4112L12.2984 14.6439L11.8919 14.7884L11.667 14.7563L11.4508 14.7081L11.2605 14.5396L10.5254 13.4162L9.5827 11.9719L8.82162 10.672H8.79342C8.76039 10.672 8.73278 10.6972 8.7297 10.73L8.27676 15.5667L8.06919 15.8154L7.6454 16H7.58486L7.17838 15.6951L6.96216 15.1976L7.17838 14.2106L7.43784 12.9268L7.6454 11.9077L7.83567 10.6399L7.95187 10.2164C7.9548 10.2057 7.95069 10.1944 7.94161 10.1881C7.91157 10.1672 7.87034 10.1741 7.84878 10.2037L6.89297 11.5145L5.44 13.4804L4.28973 14.7081L4.01297 14.8205H3.80541L3.5373 14.5717V14.4514L3.58054 14.1304L3.84865 13.7372L5.44 11.7151L6.4 10.4554L7.01872 9.73222C7.04511 9.70139 7.04245 9.65523 7.0127 9.62763C7.00333 9.61894 6.98925 9.61773 6.97854 9.62471L2.75027 12.3811L1.99784 12.4774L1.66919 12.1725L1.71243 11.675L1.86811 11.5145L3.13946 10.6399Z" fill="#3B82F6"/>
       </svg>
@@ -94,7 +101,7 @@
         <span id="claude-static-close-tooltip" style="position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); padding: 6px 12px; background: #30302E; color: #FAF9F5; border-radius: 6px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Dismiss</span>
       </button>
     `;
-      container.style.cssText = `
+            container.style.cssText = `
       position: fixed;
       bottom: 16px;
       left: 50%;
@@ -113,232 +120,208 @@
       user-select: none;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     `;
-
-      // Setup chat button hover and click handlers
-      const chatButton = container.querySelector("#claude-static-chat-button");
-      const chatTooltip = container.querySelector("#claude-static-chat-tooltip");
-
-      if (chatButton) {
-        chatButton.addEventListener("mouseenter", () => {
-          chatButton.style.background = "#F0EEE6";
-          if (chatTooltip) {
-            chatTooltip.style.opacity = "1";
-          }
-        });
-
-        chatButton.addEventListener("mouseleave", () => {
-          chatButton.style.background = "transparent";
-          if (chatTooltip) {
-            chatTooltip.style.opacity = "0";
-          }
-        });
-
-        chatButton.addEventListener("click", async () => {
-          try {
-            await chrome.runtime.sendMessage({
-              type: "SWITCH_TO_MAIN_TAB",
+            // Setup chat button hover and click handlers
+            const chatButton = container.querySelector("#claude-static-chat-button");
+            const chatTooltip = container.querySelector("#claude-static-chat-tooltip");
+            if (chatButton) {
+                chatButton.addEventListener("mouseenter", () => {
+                    chatButton.style.background = "#F0EEE6";
+                    if (chatTooltip) {
+                        chatTooltip.style.opacity = "1";
+                    }
+                });
+                chatButton.addEventListener("mouseleave", () => {
+                    chatButton.style.background = "transparent";
+                    if (chatTooltip) {
+                        chatTooltip.style.opacity = "0";
+                    }
+                });
+                chatButton.addEventListener("click", async () => {
+                    try {
+                        await chrome.runtime.sendMessage({
+                            type: "SWITCH_TO_MAIN_TAB",
+                        });
+                    }
+                    catch (_error) {
+                        // Ignore errors
+                    }
+                });
+            }
+            // Setup close button hover and click handlers
+            const closeButton = container.querySelector("#claude-static-close-button");
+            const closeTooltip = container.querySelector("#claude-static-close-tooltip");
+            if (closeButton) {
+                closeButton.addEventListener("mouseenter", () => {
+                    closeButton.style.background = "#F0EEE6";
+                    if (closeTooltip) {
+                        closeTooltip.style.opacity = "1";
+                    }
+                });
+                closeButton.addEventListener("mouseleave", () => {
+                    closeButton.style.background = "transparent";
+                    if (closeTooltip) {
+                        closeTooltip.style.opacity = "0";
+                    }
+                });
+                closeButton.addEventListener("click", async () => {
+                    try {
+                        await chrome.runtime.sendMessage({
+                            type: "DISMISS_STATIC_INDICATOR_FOR_GROUP",
+                        });
+                    }
+                    catch (_error) {
+                        // Ignore errors
+                    }
+                });
+            }
+            return container;
+        }
+        /**
+         * Shows the agent indicators (glow border)
+         */
+        function showAgentIndicators() {
+            isAgentIndicatorActive = true;
+            // Inject animation styles if needed
+            injectAnimationStyles();
+            // Create or show the glow border
+            if (glowBorderElement) {
+                glowBorderElement.style.display = "";
+            }
+            else {
+                glowBorderElement = createGlowBorderElement();
+                document.body.appendChild(glowBorderElement);
+            }
+            // Animate elements in on next frame
+            requestAnimationFrame(() => {
+                if (glowBorderElement) {
+                    glowBorderElement.style.opacity = "1";
+                }
             });
-          } catch (error) {
-            // Ignore errors
-          }
-        });
-      }
-
-      // Setup close button hover and click handlers
-      const closeButton = container.querySelector("#claude-static-close-button");
-      const closeTooltip = container.querySelector("#claude-static-close-tooltip");
-
-      if (closeButton) {
-        closeButton.addEventListener("mouseenter", () => {
-          closeButton.style.background = "#F0EEE6";
-          if (closeTooltip) {
-            closeTooltip.style.opacity = "1";
-          }
-        });
-
-        closeButton.addEventListener("mouseleave", () => {
-          closeButton.style.background = "transparent";
-          if (closeTooltip) {
-            closeTooltip.style.opacity = "0";
-          }
-        });
-
-        closeButton.addEventListener("click", async () => {
-          try {
-            await chrome.runtime.sendMessage({
-              type: "DISMISS_STATIC_INDICATOR_FOR_GROUP",
-            });
-          } catch (error) {
-            // Ignore errors
-          }
-        });
-      }
-
-      return container;
-    }
-
-    /**
-     * Shows the agent indicators (glow border)
-     */
-    function showAgentIndicators() {
-      isAgentIndicatorActive = true;
-
-      // Inject animation styles if needed
-      injectAnimationStyles();
-
-      // Create or show the glow border
-      if (glowBorderElement) {
-        glowBorderElement.style.display = "";
-      } else {
-        glowBorderElement = createGlowBorderElement();
-        document.body.appendChild(glowBorderElement);
-      }
-
-      // Animate elements in on next frame
-      requestAnimationFrame(() => {
-        if (glowBorderElement) {
-          glowBorderElement.style.opacity = "1";
         }
-      });
-    }
-
-    /**
-     * Hides the agent indicators with animation
-     */
-    function hideAgentIndicators() {
-      if (!isAgentIndicatorActive) {
-        return;
-      }
-
-      isAgentIndicatorActive = false;
-
-      // Fade out the glow border
-      if (glowBorderElement) {
-        glowBorderElement.style.opacity = "0";
-      }
-
-      // Remove elements from DOM after animation completes
-      setTimeout(() => {
-        if (isAgentIndicatorActive) {
-          return; // Don't remove if indicators were shown again
+        /**
+         * Hides the agent indicators with animation
+         */
+        function hideAgentIndicators() {
+            if (!isAgentIndicatorActive) {
+                return;
+            }
+            isAgentIndicatorActive = false;
+            // Fade out the glow border
+            if (glowBorderElement) {
+                glowBorderElement.style.opacity = "0";
+            }
+            // Remove elements from DOM after animation completes
+            setTimeout(() => {
+                if (isAgentIndicatorActive) {
+                    return; // Don't remove if indicators were shown again
+                }
+                if (glowBorderElement && glowBorderElement.parentNode) {
+                    glowBorderElement.parentNode.removeChild(glowBorderElement);
+                    glowBorderElement = null;
+                }
+            }, 300);
         }
-
-        if (glowBorderElement && glowBorderElement.parentNode) {
-          glowBorderElement.parentNode.removeChild(glowBorderElement);
-          glowBorderElement = null;
+        /**
+         * Shows the static indicator ("Claude is active in this tab group")
+         */
+        function showStaticIndicator() {
+            isStaticIndicatorActive = true;
+            // Create or show the static indicator container
+            if (staticIndicatorContainer) {
+                staticIndicatorContainer.style.display = "";
+            }
+            else {
+                staticIndicatorContainer = createStaticIndicatorContainer();
+                document.body.appendChild(staticIndicatorContainer);
+            }
+            // Clear existing heartbeat interval
+            if (heartbeatIntervalId) {
+                clearInterval(heartbeatIntervalId);
+                heartbeatIntervalId = null;
+            }
+            // Setup heartbeat to check if indicator should still be shown
+            heartbeatIntervalId = setInterval(async () => {
+                try {
+                    const response = (await chrome.runtime.sendMessage({
+                        type: "STATIC_INDICATOR_HEARTBEAT",
+                    }));
+                    if (!response?.success) {
+                        hideStaticIndicator();
+                    }
+                }
+                catch (_error) {
+                    hideStaticIndicator();
+                }
+            }, 5000); // 5 second heartbeat interval
         }
-      }, 300);
-    }
-
-    /**
-     * Shows the static indicator ("Claude is active in this tab group")
-     */
-    function showStaticIndicator() {
-      isStaticIndicatorActive = true;
-
-      // Create or show the static indicator container
-      if (staticIndicatorContainer) {
-        staticIndicatorContainer.style.display = "";
-      } else {
-        staticIndicatorContainer = createStaticIndicatorContainer();
-        document.body.appendChild(staticIndicatorContainer);
-      }
-
-      // Clear existing heartbeat interval
-      if (heartbeatIntervalId) {
-        clearInterval(heartbeatIntervalId);
-        heartbeatIntervalId = null;
-      }
-
-      // Setup heartbeat to check if indicator should still be shown
-      heartbeatIntervalId = setInterval(async () => {
-        try {
-          const response = await chrome.runtime.sendMessage({
-            type: "STATIC_INDICATOR_HEARTBEAT",
-          });
-
-          if (!response?.success) {
+        /**
+         * Hides the static indicator
+         */
+        function hideStaticIndicator() {
+            if (!isStaticIndicatorActive) {
+                return;
+            }
+            isStaticIndicatorActive = false;
+            // Clear heartbeat interval
+            if (heartbeatIntervalId) {
+                clearInterval(heartbeatIntervalId);
+                heartbeatIntervalId = null;
+            }
+            // Remove static indicator from DOM
+            if (staticIndicatorContainer && staticIndicatorContainer.parentNode) {
+                staticIndicatorContainer.parentNode.removeChild(staticIndicatorContainer);
+                staticIndicatorContainer = null;
+            }
+        }
+        // Listen for messages from the extension background script
+        chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+            if (message.type === "SHOW_AGENT_INDICATORS") {
+                showAgentIndicators();
+                sendResponse({ success: true });
+            }
+            else if (message.type === "HIDE_AGENT_INDICATORS") {
+                hideAgentIndicators();
+                sendResponse({ success: true });
+            }
+            else if (message.type === "HIDE_FOR_TOOL_USE") {
+                // Temporarily hide indicators during tool execution (e.g., screenshots)
+                wasAgentIndicatorVisible = isAgentIndicatorActive;
+                wasStaticIndicatorVisible = isStaticIndicatorActive;
+                if (glowBorderElement) {
+                    glowBorderElement.style.display = "none";
+                }
+                if (staticIndicatorContainer && isStaticIndicatorActive) {
+                    staticIndicatorContainer.style.display = "none";
+                }
+                sendResponse({ success: true });
+            }
+            else if (message.type === "SHOW_AFTER_TOOL_USE") {
+                // Restore indicators after tool execution
+                if (wasAgentIndicatorVisible) {
+                    if (glowBorderElement) {
+                        glowBorderElement.style.display = "";
+                    }
+                }
+                if (wasStaticIndicatorVisible && staticIndicatorContainer) {
+                    staticIndicatorContainer.style.display = "";
+                }
+                wasAgentIndicatorVisible = false;
+                wasStaticIndicatorVisible = false;
+                sendResponse({ success: true });
+            }
+            else if (message.type === "SHOW_STATIC_INDICATOR") {
+                showStaticIndicator();
+                sendResponse({ success: true });
+            }
+            else if (message.type === "HIDE_STATIC_INDICATOR") {
+                hideStaticIndicator();
+                sendResponse({ success: true });
+            }
+        });
+        // Clean up indicators when page is about to unload
+        window.addEventListener("beforeunload", () => {
+            hideAgentIndicators();
             hideStaticIndicator();
-          }
-        } catch (error) {
-          hideStaticIndicator();
-        }
-      }, 5000); // 5 second heartbeat interval
-    }
-
-    /**
-     * Hides the static indicator
-     */
-    function hideStaticIndicator() {
-      if (!isStaticIndicatorActive) {
-        return;
-      }
-
-      isStaticIndicatorActive = false;
-
-      // Clear heartbeat interval
-      if (heartbeatIntervalId) {
-        clearInterval(heartbeatIntervalId);
-        heartbeatIntervalId = null;
-      }
-
-      // Remove static indicator from DOM
-      if (staticIndicatorContainer && staticIndicatorContainer.parentNode) {
-        staticIndicatorContainer.parentNode.removeChild(staticIndicatorContainer);
-        staticIndicatorContainer = null;
-      }
-    }
-
-    // Listen for messages from the extension background script
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type === "SHOW_AGENT_INDICATORS") {
-        showAgentIndicators();
-        sendResponse({ success: true });
-      } else if (message.type === "HIDE_AGENT_INDICATORS") {
-        hideAgentIndicators();
-        sendResponse({ success: true });
-      } else if (message.type === "HIDE_FOR_TOOL_USE") {
-        // Temporarily hide indicators during tool execution (e.g., screenshots)
-        wasAgentIndicatorVisible = isAgentIndicatorActive;
-        wasStaticIndicatorVisible = isStaticIndicatorActive;
-
-        if (glowBorderElement) {
-          glowBorderElement.style.display = "none";
-        }
-        if (staticIndicatorContainer && isStaticIndicatorActive) {
-          staticIndicatorContainer.style.display = "none";
-        }
-
-        sendResponse({ success: true });
-      } else if (message.type === "SHOW_AFTER_TOOL_USE") {
-        // Restore indicators after tool execution
-        if (wasAgentIndicatorVisible) {
-          if (glowBorderElement) {
-            glowBorderElement.style.display = "";
-          }
-        }
-
-        if (wasStaticIndicatorVisible && staticIndicatorContainer) {
-          staticIndicatorContainer.style.display = "";
-        }
-
-        wasAgentIndicatorVisible = false;
-        wasStaticIndicatorVisible = false;
-
-        sendResponse({ success: true });
-      } else if (message.type === "SHOW_STATIC_INDICATOR") {
-        showStaticIndicator();
-        sendResponse({ success: true });
-      } else if (message.type === "HIDE_STATIC_INDICATOR") {
-        hideStaticIndicator();
-        sendResponse({ success: true });
-      }
-    });
-
-    // Clean up indicators when page is about to unload
-    window.addEventListener("beforeunload", () => {
-      hideAgentIndicators();
-      hideStaticIndicator();
-    });
-  })();
+        });
+    })();
 })();

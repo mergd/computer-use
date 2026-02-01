@@ -1,5 +1,6 @@
+// @ts-nocheck
 /**
- * tab-group-manager.js - Chrome Tab Group Management
+ * tab-group-manager.ts - Chrome Tab Group Management
  *
  * CLASSES:
  *   M = TabSubscriptionManager - Manages tab event subscriptions
@@ -15,1427 +16,1816 @@
  *   j ("Computer Control" constant)
  *   z ("MCP" constant)
  */
-import { S as o } from "./storage.js";
-
+import { S as StorageKeys } from "./storage.js";
 // DomainCategoryCache is imported from mcp-tools.js
 let W = null;
 export function setDomainCategoryCache(cache) {
-  W = cache;
+    W = cache;
 }
-
 // ============================================================================
 // TabSubscriptionManager (class M) - Manages tab event subscriptions
 // ============================================================================
 class M {
-  static instance = null;
-  subscriptions = new Map();
-  chromeUpdateListener = null;
-  chromeActivatedListener = null;
-  chromeRemovedListener = null;
-  relevantTabIds = new Set();
-  nextSubscriptionId = 1;
-  constructor() {}
-  static getInstance() {
-    return (M.instance || (M.instance = new M()), M.instance);
-  }
-  subscribe(e, t, r) {
-    const o = "sub_" + this.nextSubscriptionId++;
-    return (
-      this.subscriptions.set(o, { tabId: e, eventTypes: t, callback: r }),
-      "all" !== e && this.relevantTabIds.add(e),
-      1 === this.subscriptions.size && this.startListeners(),
-      o
-    );
-  }
-  unsubscribe(e) {
-    const t = this.subscriptions.get(e);
-    if (t) {
-      if ((this.subscriptions.delete(e), "all" !== t.tabId)) {
-        let e = !1;
-        for (const [, r] of this.subscriptions)
-          if (r.tabId === t.tabId) {
-            e = !0;
-            break;
-          }
-        e || this.relevantTabIds.delete(t.tabId);
-      }
-      0 === this.subscriptions.size && this.stopListeners();
+    static instance = null;
+    subscriptions = new Map();
+    chromeUpdateListener = null;
+    chromeActivatedListener = null;
+    chromeRemovedListener = null;
+    relevantTabIds = new Set();
+    nextSubscriptionId = 1;
+    constructor() { }
+    static getInstance() {
+        if (!M.instance) {
+            M.instance = new M();
+        }
+        return M.instance;
     }
-  }
-  startListeners() {
-    ((this.chromeUpdateListener = (e, t, r) => {
-      if (this.relevantTabIds.size > 0 && !this.relevantTabIds.has(e)) {
-        let e = !1;
-        for (const [, t] of this.subscriptions)
-          if ("all" === t.tabId) {
-            e = !0;
-            break;
-          }
-        if (!e) return;
-      }
-      const o = {};
-      let n = !1;
-      if (
-        (void 0 !== t.url && ((o.url = t.url), (n = !0)),
-        void 0 !== t.status && ((o.status = t.status), (n = !0)),
-        "groupId" in t && ((o.groupId = t.groupId), (n = !0)),
-        void 0 !== t.title && ((o.title = t.title), (n = !0)),
-        n)
-      )
-        for (const [, a] of this.subscriptions) {
-          if ("all" !== a.tabId && a.tabId !== e) continue;
-          let t = !1;
-          for (const e of a.eventTypes)
-            if (void 0 !== o[e]) {
-              t = !0;
-              break;
-            }
-          if (t)
-            try {
-              a.callback(e, o, r);
-            } catch (i) {}
+    subscribe(tabId, eventTypes, callback) {
+        const subscriptionId = "sub_" + this.nextSubscriptionId++;
+        this.subscriptions.set(subscriptionId, { tabId, eventTypes, callback });
+        if (tabId !== "all") {
+            this.relevantTabIds.add(tabId);
         }
-    }),
-      (this.chromeActivatedListener = (e) => {
-        const t = e.tabId;
-        if (this.relevantTabIds.size > 0 && !this.relevantTabIds.has(t)) {
-          let e = !1;
-          for (const [, t] of this.subscriptions)
-            if ("all" === t.tabId) {
-              e = !0;
-              break;
-            }
-          if (!e) return;
+        if (this.subscriptions.size === 1) {
+            this.startListeners();
         }
-        const r = { active: !0 };
-        for (const [, n] of this.subscriptions)
-          if (
-            ("all" === n.tabId || n.tabId === t) &&
-            n.eventTypes.includes("active")
-          )
-            try {
-              n.callback(t, r);
-            } catch (o) {}
-      }),
-      chrome.tabs.onUpdated.addListener(this.chromeUpdateListener),
-      chrome.tabs.onActivated.addListener(this.chromeActivatedListener),
-      (this.chromeRemovedListener = (e) => {
-        if (this.relevantTabIds.size > 0 && !this.relevantTabIds.has(e)) {
-          let e = !1;
-          for (const [, t] of this.subscriptions)
-            if ("all" === t.tabId) {
-              e = !0;
-              break;
+        return subscriptionId;
+    }
+    unsubscribe(subscriptionId) {
+        const subscription = this.subscriptions.get(subscriptionId);
+        if (subscription) {
+            this.subscriptions.delete(subscriptionId);
+            if (subscription.tabId !== "all") {
+                let hasOtherSubscription = false;
+                for (const [, sub] of this.subscriptions) {
+                    if (sub.tabId === subscription.tabId) {
+                        hasOtherSubscription = true;
+                        break;
+                    }
+                }
+                if (!hasOtherSubscription) {
+                    this.relevantTabIds.delete(subscription.tabId);
+                }
             }
-          if (!e) return;
+            if (this.subscriptions.size === 0) {
+                this.stopListeners();
+            }
         }
-        const t = { removed: !0 };
-        for (const [, o] of this.subscriptions)
-          if (
-            ("all" === o.tabId || o.tabId === e) &&
-            o.eventTypes.includes("removed")
-          )
-            try {
-              o.callback(e, t);
-            } catch (r) {}
-      }),
-      chrome.tabs.onRemoved.addListener(this.chromeRemovedListener));
-  }
-  stopListeners() {
-    (this.chromeUpdateListener &&
-      (chrome.tabs.onUpdated.removeListener(this.chromeUpdateListener),
-      (this.chromeUpdateListener = null)),
-      this.chromeActivatedListener &&
-        (chrome.tabs.onActivated.removeListener(this.chromeActivatedListener),
-        (this.chromeActivatedListener = null)),
-      this.chromeRemovedListener &&
-        (chrome.tabs.onRemoved.removeListener(this.chromeRemovedListener),
-        (this.chromeRemovedListener = null)),
-      this.relevantTabIds.clear());
-  }
-  getSubscriptionCount() {
-    return this.subscriptions.size;
-  }
-  hasActiveListeners() {
-    return (
-      null !== this.chromeUpdateListener ||
-      null !== this.chromeActivatedListener ||
-      null !== this.chromeRemovedListener
-    );
-  }
+    }
+    startListeners() {
+        this.chromeUpdateListener = (tabId, changeInfo, tab) => {
+            if (this.relevantTabIds.size > 0 && !this.relevantTabIds.has(tabId)) {
+                let hasAllSubscription = false;
+                for (const [, sub] of this.subscriptions) {
+                    if (sub.tabId === "all") {
+                        hasAllSubscription = true;
+                        break;
+                    }
+                }
+                if (!hasAllSubscription)
+                    return;
+            }
+            const changes = {};
+            let hasChanges = false;
+            if (changeInfo.url !== undefined) {
+                changes.url = changeInfo.url;
+                hasChanges = true;
+            }
+            if (changeInfo.status !== undefined) {
+                changes.status = changeInfo.status;
+                hasChanges = true;
+            }
+            if ("groupId" in changeInfo) {
+                changes.groupId = changeInfo.groupId;
+                hasChanges = true;
+            }
+            if (changeInfo.title !== undefined) {
+                changes.title = changeInfo.title;
+                hasChanges = true;
+            }
+            if (hasChanges) {
+                for (const [, sub] of this.subscriptions) {
+                    if (sub.tabId !== "all" && sub.tabId !== tabId)
+                        continue;
+                    let shouldNotify = false;
+                    for (const eventType of sub.eventTypes) {
+                        if (changes[eventType] !== undefined) {
+                            shouldNotify = true;
+                            break;
+                        }
+                    }
+                    if (shouldNotify) {
+                        try {
+                            sub.callback(tabId, changes, tab);
+                        }
+                        catch {
+                            // Ignore callback errors
+                        }
+                    }
+                }
+            }
+        };
+        this.chromeActivatedListener = (activeInfo) => {
+            const tabId = activeInfo.tabId;
+            if (this.relevantTabIds.size > 0 && !this.relevantTabIds.has(tabId)) {
+                let hasAllSubscription = false;
+                for (const [, sub] of this.subscriptions) {
+                    if (sub.tabId === "all") {
+                        hasAllSubscription = true;
+                        break;
+                    }
+                }
+                if (!hasAllSubscription)
+                    return;
+            }
+            const changes = { active: true };
+            for (const [, sub] of this.subscriptions) {
+                if ((sub.tabId === "all" || sub.tabId === tabId) &&
+                    sub.eventTypes.includes("active")) {
+                    try {
+                        sub.callback(tabId, changes);
+                    }
+                    catch {
+                        // Ignore callback errors
+                    }
+                }
+            }
+        };
+        chrome.tabs.onUpdated.addListener(this.chromeUpdateListener);
+        chrome.tabs.onActivated.addListener(this.chromeActivatedListener);
+        this.chromeRemovedListener = (tabId) => {
+            if (this.relevantTabIds.size > 0 && !this.relevantTabIds.has(tabId)) {
+                let hasAllSubscription = false;
+                for (const [, sub] of this.subscriptions) {
+                    if (sub.tabId === "all") {
+                        hasAllSubscription = true;
+                        break;
+                    }
+                }
+                if (!hasAllSubscription)
+                    return;
+            }
+            const changes = { removed: true };
+            for (const [, sub] of this.subscriptions) {
+                if ((sub.tabId === "all" || sub.tabId === tabId) &&
+                    sub.eventTypes.includes("removed")) {
+                    try {
+                        sub.callback(tabId, changes);
+                    }
+                    catch {
+                        // Ignore callback errors
+                    }
+                }
+            }
+        };
+        chrome.tabs.onRemoved.addListener(this.chromeRemovedListener);
+    }
+    stopListeners() {
+        if (this.chromeUpdateListener) {
+            chrome.tabs.onUpdated.removeListener(this.chromeUpdateListener);
+            this.chromeUpdateListener = null;
+        }
+        if (this.chromeActivatedListener) {
+            chrome.tabs.onActivated.removeListener(this.chromeActivatedListener);
+            this.chromeActivatedListener = null;
+        }
+        if (this.chromeRemovedListener) {
+            chrome.tabs.onRemoved.removeListener(this.chromeRemovedListener);
+            this.chromeRemovedListener = null;
+        }
+        this.relevantTabIds.clear();
+    }
+    getSubscriptionCount() {
+        return this.subscriptions.size;
+    }
+    hasActiveListeners() {
+        return (this.chromeUpdateListener !== null ||
+            this.chromeActivatedListener !== null ||
+            this.chromeRemovedListener !== null);
+    }
 }
 const D = () => M.getInstance();
-
-const j = "Computer Control",
-  z = "MCP";
-
+const j = "Computer Control";
+const z = "MCP";
 // ============================================================================
 // TabGroupManager (class H) - Manages Chrome tab groups for MCP sessions
 // Singleton accessed via K = H.getInstance()
 // ============================================================================
 class H {
-  static instance;
-  groupMetadata = new Map();
-  initialized = !1;
-  STORAGE_KEY = o.TAB_GROUPS;
-  groupBlocklistStatuses = new Map();
-  blocklistListeners = new Set();
-  indicatorUpdateTimer = null;
-  INDICATOR_UPDATE_DELAY = 100;
-  pendingRegroups = new Map();
-  processingMainTabRemoval = new Set();
-  mcpTabGroupId = null;
-  MCP_TAB_GROUP_KEY = o.MCP_TAB_GROUP_ID;
-  tabGroupListenerSubscriptionId = null;
-  isTabGroupListenerStarted = !1;
-  DISMISSED_GROUPS_KEY = o.DISMISSED_TAB_GROUPS;
-  constructor() {
-    this.startTabRemovalListener();
-  }
-  startTabRemovalListener() {
-    chrome.tabs.onRemoved.addListener(async (e) => {
-      for (const [t, r] of this.groupBlocklistStatuses.entries())
-        r.categoriesByTab.has(e) &&
-          (await this.removeTabFromBlocklistTracking(t, e));
-    });
-  }
-  static getInstance() {
-    return (H.instance || (H.instance = new H()), H.instance);
-  }
-  async dismissStaticIndicatorsForGroup(e) {
-    const t =
-      (await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY))[
-        this.DISMISSED_GROUPS_KEY
-      ] || [];
-    (t.includes(e) || t.push(e),
-      await chrome.storage.local.set({ [this.DISMISSED_GROUPS_KEY]: t }));
-    try {
-      const t = await chrome.tabs.query({ groupId: e });
-      for (const e of t)
-        if (e.id)
-          try {
-            await chrome.tabs.sendMessage(e.id, {
-              type: "HIDE_STATIC_INDICATOR",
-            });
-          } catch (r) {}
-    } catch (r) {}
-  }
-  async isGroupDismissed(e) {
-    try {
-      const t = (await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY))[
-        this.DISMISSED_GROUPS_KEY
-      ];
-      return !!Array.isArray(t) && t.includes(e);
-    } catch (t) {
-      return !1;
+    static instance;
+    groupMetadata = new Map();
+    initialized = false;
+    STORAGE_KEY = StorageKeys.TAB_GROUPS;
+    groupBlocklistStatuses = new Map();
+    blocklistListeners = new Set();
+    indicatorUpdateTimer = null;
+    INDICATOR_UPDATE_DELAY = 100;
+    pendingRegroups = new Map();
+    processingMainTabRemoval = new Set();
+    mcpTabGroupId = null;
+    MCP_TAB_GROUP_KEY = StorageKeys.MCP_TAB_GROUP_ID;
+    tabGroupListenerSubscriptionId = null;
+    isTabGroupListenerStarted = false;
+    DISMISSED_GROUPS_KEY = StorageKeys.DISMISSED_TAB_GROUPS;
+    constructor() {
+        this.startTabRemovalListener();
     }
-  }
-  async initialize(e = !1) {
-    (this.initialized && !e) ||
-      (await this.loadFromStorage(),
-      await this.reconcileWithChrome(),
-      (this.initialized = !0));
-  }
-  startTabGroupChangeListener() {
-    if (this.isTabGroupListenerStarted) return;
-    const e = D();
-    ((this.tabGroupListenerSubscriptionId = e.subscribe(
-      "all",
-      ["groupId"],
-      async (e, t) => {
-        "groupId" in t && (await this.handleTabGroupChange(e, t.groupId));
-      },
-    )),
-      (this.isTabGroupListenerStarted = !0));
-  }
-  stopTabGroupChangeListener() {
-    if (!this.isTabGroupListenerStarted || !this.tabGroupListenerSubscriptionId)
-      return;
-    (D().unsubscribe(this.tabGroupListenerSubscriptionId),
-      (this.tabGroupListenerSubscriptionId = null),
-      (this.isTabGroupListenerStarted = !1));
-  }
-  async handleTabGroupChange(e, t) {
-    for (const [n, i] of this.groupMetadata.entries())
-      if (i.memberStates.has(e)) {
-        if (t === chrome.tabGroups.TAB_GROUP_ID_NONE || t !== i.chromeGroupId) {
-          const t = i.memberStates.get(e),
-            a = t?.indicatorState || "none";
-          try {
-            let t = "HIDE_AGENT_INDICATORS";
-            ("static" === a && (t = "HIDE_STATIC_INDICATOR"),
-              await this.sendIndicatorMessage(e, t));
-          } catch (r) {}
-          if ((i.memberStates.delete(e), e === n)) {
-            if (this.processingMainTabRemoval.has(n)) return;
-            if (this.pendingRegroups.has(n)) return;
-            this.processingMainTabRemoval.add(n);
-            const e = i.memberStates.get(n)?.indicatorState || "none",
-              t = i.chromeGroupId;
-            try {
-              const r = await chrome.tabs.group({ tabIds: [n] });
-              if (
-                (await chrome.tabGroups.update(r, {
-                  title: j,
-                  color: chrome.tabGroups.Color.ORANGE,
-                  collapsed: !1,
-                }),
-                (i.chromeGroupId = r),
-                i.memberStates.clear(),
-                i.memberStates.set(n, { indicatorState: e }),
-                t !== r && this.groupBlocklistStatuses.delete(t),
-                "pulsing" === e)
-              )
-                try {
-                  await this.sendIndicatorMessage(n, "SHOW_AGENT_INDICATORS");
-                } catch (o) {}
-              return (
-                this.groupMetadata.set(n, i),
-                await this.saveToStorage(),
-                await this.cleanupOldGroup(t, n),
-                void this.processingMainTabRemoval.delete(n)
-              );
-            } catch (r) {
-              return r instanceof Error &&
-                r.message &&
-                r.message.includes("dragging")
-                ? (this.pendingRegroups.set(n, {
-                    tabId: n,
-                    originalGroupId: t,
-                    indicatorState: e,
-                    metadata: i,
-                    attemptCount: 0,
-                  }),
-                  void this.scheduleRegroupRetry(n))
-                : (this.groupMetadata.delete(n),
-                  this.groupBlocklistStatuses.delete(t),
-                  await this.saveToStorage(),
-                  void this.processingMainTabRemoval.delete(n));
+    startTabRemovalListener() {
+        chrome.tabs.onRemoved.addListener(async (tabId) => {
+            for (const [groupId, status] of this.groupBlocklistStatuses.entries()) {
+                if (status.categoriesByTab.has(tabId)) {
+                    await this.removeTabFromBlocklistTracking(groupId, tabId);
+                }
             }
-          }
-          await this.saveToStorage();
-          break;
-        }
-      }
-    if (t && t !== chrome.tabGroups.TAB_GROUP_ID_NONE)
-      for (const [n, i] of this.groupMetadata.entries())
-        if (i.chromeGroupId === t) {
-          if (!i.memberStates.has(e)) {
-            const t = e !== n;
-            i.memberStates.set(e, { indicatorState: t ? "static" : "none" });
-            try {
-              const t = await chrome.tabs.get(e);
-              t.url && (await this.updateTabBlocklistStatus(e, t.url));
-            } catch (r) {}
-            const o = await this.isGroupDismissed(i.chromeGroupId);
-            if (t && !o) {
-              let t = 0;
-              const o = 3,
-                n = 500,
-                i = async () => {
-                  try {
-                    return (
-                      await this.sendIndicatorMessage(
-                        e,
-                        "SHOW_STATIC_INDICATOR",
-                      ),
-                      !0
-                    );
-                  } catch (r) {
-                    return (t++, t < o && setTimeout(i, n), !1);
-                  }
-                };
-              await i();
-            }
-            await this.saveToStorage();
-          }
-          break;
-        }
-  }
-  async cleanupOldGroup(e, t) {
-    try {
-      const r = await chrome.tabs.query({ groupId: e });
-      for (const e of r)
-        if (e.id && e.id !== t)
-          try {
-            await this.sendIndicatorMessage(e.id, "HIDE_STATIC_INDICATOR");
-          } catch {}
-      const o = r.filter((e) => e.id && e.id !== t).map((e) => e.id);
-      o.length > 0 && (await chrome.tabs.ungroup(o));
-    } catch (r) {}
-  }
-  scheduleRegroupRetry(e) {
-    const t = this.pendingRegroups.get(e);
-    t &&
-      (t.timeoutId && clearTimeout(t.timeoutId),
-      (t.timeoutId = setTimeout(() => {
-        this.attemptRegroup(e);
-      }, 1e3)));
-  }
-  async attemptRegroup(e) {
-    const t = this.pendingRegroups.get(e);
-    if (t) {
-      t.attemptCount++;
-      try {
-        if (
-          (await chrome.tabs.get(e)).groupId !==
-          chrome.tabGroups.TAB_GROUP_ID_NONE
-        )
-          return void this.pendingRegroups.delete(e);
-        const o = await chrome.tabs.group({ tabIds: [e] });
-        if (
-          (await chrome.tabGroups.update(o, {
-            title: j,
-            color: chrome.tabGroups.Color.ORANGE,
-            collapsed: !1,
-          }),
-          (t.metadata.chromeGroupId = o),
-          t.metadata.memberStates.clear(),
-          t.metadata.memberStates.set(e, { indicatorState: t.indicatorState }),
-          t.originalGroupId !== o &&
-            this.groupBlocklistStatuses.delete(t.originalGroupId),
-          "pulsing" === t.indicatorState)
-        )
-          try {
-            await this.sendIndicatorMessage(e, "SHOW_AGENT_INDICATORS");
-          } catch (r) {}
-        (this.groupMetadata.set(e, t.metadata),
-          await this.saveToStorage(),
-          await this.cleanupOldGroup(t.originalGroupId, e),
-          this.pendingRegroups.delete(e),
-          this.processingMainTabRemoval.delete(e));
-      } catch {
-        if (t.attemptCount < 5) this.scheduleRegroupRetry(e);
-        else {
-          try {
-            const o = await chrome.tabs.group({ tabIds: [e] });
-            if (
-              (await chrome.tabGroups.update(o, {
-                title: j,
-                color: chrome.tabGroups.Color.ORANGE,
-                collapsed: !1,
-              }),
-              (t.metadata.chromeGroupId = o),
-              t.metadata.memberStates.clear(),
-              t.metadata.memberStates.set(e, {
-                indicatorState: t.indicatorState,
-              }),
-              t.originalGroupId !== o &&
-                this.groupBlocklistStatuses.delete(t.originalGroupId),
-              "pulsing" === t.indicatorState)
-            )
-              try {
-                await this.sendIndicatorMessage(e, "SHOW_AGENT_INDICATORS");
-              } catch (r) {}
-            (this.groupMetadata.set(e, t.metadata),
-              await this.saveToStorage(),
-              await this.cleanupOldGroup(t.originalGroupId, e));
-          } catch (o) {
-            (this.groupMetadata.delete(e),
-              this.groupBlocklistStatuses.delete(t.originalGroupId),
-              await this.saveToStorage());
-          }
-          (this.pendingRegroups.delete(e),
-            this.processingMainTabRemoval.delete(e));
-        }
-      }
-    }
-  }
-  async loadFromStorage() {
-    try {
-      const e = (await chrome.storage.local.get(this.STORAGE_KEY))[
-        this.STORAGE_KEY
-      ];
-      e &&
-        "object" == typeof e &&
-        (this.groupMetadata = new Map(
-          Object.entries(e).map(([e, t]) => {
-            const r = t;
-            return (
-              r.memberStates && "object" == typeof r.memberStates
-                ? (r.memberStates = new Map(
-                    Object.entries(r.memberStates).map(([e, t]) => [
-                      parseInt(e),
-                      t,
-                    ]),
-                  ))
-                : (r.memberStates = new Map()),
-              [parseInt(e), r]
-            );
-          }),
-        ));
-    } catch (e) {}
-  }
-  async saveToStorage() {
-    try {
-      const e = Object.fromEntries(
-        Array.from(this.groupMetadata.entries()).map(([e, t]) => [
-          e,
-          {
-            ...t,
-            memberStates: Object.fromEntries(t.memberStates || new Map()),
-          },
-        ]),
-      );
-      await chrome.storage.local.set({ [this.STORAGE_KEY]: e });
-    } catch (e) {}
-  }
-  findMainTabInChromeGroup(e) {
-    for (const [t, r] of this.groupMetadata.entries())
-      if (r.chromeGroupId === e) return t;
-    return null;
-  }
-  async createGroup(e) {
-    const t = await this.findGroupByMainTab(e);
-    if (t) return t;
-    const r = await chrome.tabs.get(e);
-    let o,
-      n = "blank";
-    if (r.url && "" !== r.url && !r.url.startsWith("chrome://"))
-      try {
-        n = new URL(r.url).hostname || "blank";
-      } catch {
-        n = "blank";
-      }
-    if (r.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-      this.findMainTabInChromeGroup(r.groupId) ||
-        (await chrome.tabs.ungroup([e]));
-    }
-    let i = 3;
-    for (; i > 0; )
-      try {
-        o = await chrome.tabs.group({ tabIds: [e] });
-        break;
-      } catch (c) {
-        if ((i--, 0 === i)) throw c;
-        await new Promise((e) => setTimeout(e, 100));
-      }
-    if (!o) throw new Error("Failed to create Chrome tab group");
-    await chrome.tabGroups.update(o, {
-      title: j,
-      color: chrome.tabGroups.Color.ORANGE,
-      collapsed: !1,
-    });
-    const a = {
-      mainTabId: e,
-      createdAt: Date.now(),
-      domain: n,
-      chromeGroupId: o,
-      memberStates: new Map(),
-    };
-    (a.memberStates.set(e, { indicatorState: "none" }),
-      this.groupMetadata.set(e, a),
-      await this.saveToStorage());
-    const s = await this.getGroupMembers(o);
-    return { ...a, memberTabs: s };
-  }
-  async adoptOrphanedGroup(e, t) {
-    const r = await this.findGroupByMainTab(e);
-    if (r) return r;
-    const o = await chrome.tabs.get(e);
-    if (!o.url) throw new Error("Tab has no URL");
-    const n = new URL(o.url).hostname;
-    if (o.groupId !== t)
-      throw new Error(`Tab ${e} is not in Chrome group ${t}`);
-    const i = {
-      mainTabId: e,
-      createdAt: Date.now(),
-      domain: n,
-      chromeGroupId: t,
-      memberStates: new Map(),
-    };
-    i.memberStates.set(e, { indicatorState: "none" });
-    const a = await chrome.tabs.query({ groupId: t });
-    for (const c of a)
-      c.id &&
-        c.id !== e &&
-        i.memberStates.set(c.id, { indicatorState: "static" });
-    (this.groupMetadata.set(e, i), await this.saveToStorage());
-    const s = await this.getGroupMembers(t);
-    return { ...i, memberTabs: s };
-  }
-  async addTabToGroup(e, t) {
-    const r = this.groupMetadata.get(e);
-    if (r) {
-      try {
-        (await chrome.tabs.group({ tabIds: [t], groupId: r.chromeGroupId }),
-          r.memberStates.has(t) ||
-            r.memberStates.set(t, {
-              indicatorState: t === e ? "none" : "static",
-            }));
-        try {
-          const e = await chrome.tabs.get(t);
-          e.url && (await this.updateTabBlocklistStatus(t, e.url));
-        } catch (o) {}
-        const n = await this.isGroupDismissed(r.chromeGroupId);
-        if (t !== e && !n)
-          try {
-            await chrome.tabs.sendMessage(t, { type: "SHOW_STATIC_INDICATOR" });
-          } catch {}
-      } catch (o) {}
-      await this.saveToStorage();
-    }
-  }
-  async getGroupMembers(e) {
-    const t = await chrome.tabs.query({ groupId: e });
-    let r;
-    for (const [, o] of this.groupMetadata.entries())
-      if (o.chromeGroupId === e) {
-        r = o;
-        break;
-      }
-    return t
-      .filter((e) => void 0 !== e.id)
-      .map((e) => {
-        const t = e.id,
-          o = r?.memberStates.get(t);
-        return {
-          tabId: t,
-          url: e.url || "",
-          title: e.title || "",
-          joinedAt: Date.now(),
-          indicatorState: o?.indicatorState || "none",
-        };
-      });
-  }
-  async getGroupDetails(e) {
-    const t = this.groupMetadata.get(e);
-    if (!t) throw new Error(`No group found for main tab ${e}`);
-    const r = await this.getGroupMembers(t.chromeGroupId);
-    return { ...t, memberTabs: r };
-  }
-  async findOrphanedTabs() {
-    const e = [],
-      t = new Set(),
-      r = await chrome.tabs.query({
-        groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
-      }),
-      o = new Set();
-    for (const [n] of this.groupMetadata.entries()) {
-      o.add(n);
-      const e = await this.findGroupByMainTab(n);
-      e && e.memberTabs.forEach((e) => o.add(e.tabId));
-    }
-    for (const n of r) {
-      if (!n.id || t.has(n.id) || o.has(n.id)) continue;
-      t.add(n.id);
-      n.openerTabId &&
-        o.has(n.openerTabId) &&
-        n.url &&
-        !n.url.startsWith("chrome://") &&
-        !n.url.startsWith("chrome-extension://") &&
-        !("about:blank" === n.url) &&
-        e.push({
-          tabId: n.id,
-          url: n.url || "",
-          title: n.title || "",
-          openerTabId: n.openerTabId,
-          detectedAt: Date.now(),
         });
     }
-    return e;
-  }
-  async reconcileWithChrome() {
-    const e = await chrome.tabs.query({}),
-      t = new Set();
-    for (const n of e)
-      n.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && t.add(n.groupId);
-    const r = [];
-    let o = !1;
-    for (const [n, i] of this.groupMetadata.entries())
-      try {
-        const e = await chrome.tabs.get(n);
-        if (t.has(i.chromeGroupId))
-          if (e.groupId !== i.chromeGroupId) r.push(n);
-          else {
-            const e = await chrome.tabs.query({ groupId: i.chromeGroupId }),
-              t = new Set(e.map((e) => e.id).filter((e) => void 0 !== e)),
-              r = [];
-            for (const [o] of i.memberStates) t.has(o) || r.push(o);
-            if (r.length > 0) {
-              for (const e of r) {
-                i.memberStates.delete(e);
-                try {
-                  await this.sendIndicatorMessage(e, "HIDE_AGENT_INDICATORS");
-                } catch {}
-              }
-              o = !0;
+    static getInstance() {
+        if (!H.instance) {
+            H.instance = new H();
+        }
+        return H.instance;
+    }
+    async dismissStaticIndicatorsForGroup(chromeGroupId) {
+        const dismissedGroups = (await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY))[this.DISMISSED_GROUPS_KEY] || [];
+        if (!dismissedGroups.includes(chromeGroupId)) {
+            dismissedGroups.push(chromeGroupId);
+        }
+        await chrome.storage.local.set({
+            [this.DISMISSED_GROUPS_KEY]: dismissedGroups,
+        });
+        try {
+            const tabs = await chrome.tabs.query({ groupId: chromeGroupId });
+            for (const tab of tabs) {
+                if (tab.id) {
+                    try {
+                        await chrome.tabs.sendMessage(tab.id, {
+                            type: "HIDE_STATIC_INDICATOR",
+                        });
+                    }
+                    catch {
+                        // Ignore message errors
+                    }
+                }
             }
-          }
-        else r.push(n);
-      } catch {
-        r.push(n);
-      }
-    for (const n of r) this.groupMetadata.delete(n);
-    (r.length > 0 || o) && (await this.saveToStorage());
-  }
-  async getAllGroups() {
-    await this.initialize();
-    const e = [];
-    for (const [r, o] of this.groupMetadata.entries())
-      try {
-        const t = await this.getGroupMembers(o.chromeGroupId);
-        e.push({ ...o, memberTabs: t });
-      } catch (t) {}
-    return e;
-  }
-  async findGroupByTab(e) {
-    await this.initialize();
-    const t = this.groupMetadata.get(e);
-    if (t) {
-      const e = await this.getGroupMembers(t.chromeGroupId);
-      return { ...t, memberTabs: e };
+        }
+        catch {
+            // Ignore query errors
+        }
     }
-    const r = await chrome.tabs.get(e);
-    if (r.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return null;
-    for (const [, i] of this.groupMetadata.entries())
-      if (i.chromeGroupId === r.groupId) {
-        const e = await this.getGroupMembers(i.chromeGroupId);
-        return { ...i, memberTabs: e };
-      }
-    const o = await chrome.tabs.query({ groupId: r.groupId });
-    if (0 === o.length) return null;
-    o.sort((e, t) => e.index - t.index);
-    const n = o[0];
-    if (!n.id || !n.url) return null;
-    return {
-      mainTabId: n.id,
-      createdAt: Date.now(),
-      domain: new URL(n.url).hostname,
-      chromeGroupId: r.groupId,
-      memberStates: new Map(),
-      memberTabs: o
-        .filter((e) => void 0 !== e.id)
-        .map((e) => ({
-          tabId: e.id,
-          url: e.url || "",
-          title: e.title || "",
-          joinedAt: Date.now(),
-        })),
-      isUnmanaged: !0,
-    };
-  }
-  async findGroupByMainTab(e) {
-    await this.initialize();
-    const t = this.groupMetadata.get(e);
-    if (!t) return null;
-    try {
-      const e = await this.getGroupMembers(t.chromeGroupId);
-      return { ...t, memberTabs: e };
-    } catch (r) {
-      return null;
+    async isGroupDismissed(chromeGroupId) {
+        try {
+            const dismissedGroups = (await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY))[this.DISMISSED_GROUPS_KEY];
+            return Array.isArray(dismissedGroups) && dismissedGroups.includes(chromeGroupId);
+        }
+        catch {
+            return false;
+        }
     }
-  }
-  async isInGroup(e) {
-    return null !== (await this.findGroupByTab(e));
-  }
-  isMainTab(e) {
-    return this.groupMetadata.has(e);
-  }
-  async getMainTabId(e) {
-    const t = await this.findGroupByTab(e);
-    return t?.mainTabId || null;
-  }
-  async promoteToMainTab(e, t) {
-    const r = this.groupMetadata.get(e);
-    if (!r) throw new Error(`No group found for main tab ${e}`);
-    if ((await chrome.tabs.get(t)).groupId !== r.chromeGroupId)
-      throw new Error(`Tab ${t} is not in the same group as ${e}`);
-    const o = r.memberStates.get(e) || { indicatorState: "none" };
-    try {
-      (await chrome.tabs.get(e),
-        "pulsing" === o.indicatorState &&
-          (await this.sendIndicatorMessage(e, "HIDE_AGENT_INDICATORS")));
-    } catch {}
-    r.memberStates.get(t);
-    r.mainTabId = t;
-    try {
-      (await this.sendIndicatorMessage(t, "HIDE_STATIC_INDICATOR"),
-        r.memberStates.delete(t));
-    } catch (n) {}
-    ("pulsing" === o.indicatorState
-      ? (r.memberStates.set(t, { indicatorState: "pulsing" }),
-        await this.sendIndicatorMessage(t, "SHOW_AGENT_INDICATORS"))
-      : r.memberStates.set(t, { indicatorState: "none" }),
-      this.groupMetadata.delete(e),
-      this.groupMetadata.set(t, r),
-      await this.saveToStorage());
-  }
-  async deleteGroup(e) {
-    const t = this.groupMetadata.get(e);
-    if (t) {
-      try {
-        const e = await chrome.tabs.query({ groupId: t.chromeGroupId }),
-          o = e.map((e) => e.id).filter((e) => void 0 !== e);
-        if (o.length > 0)
-          try {
-            for (const t of e)
-              if (t.id)
+    async initialize(force = false) {
+        if (this.initialized && !force)
+            return;
+        await this.loadFromStorage();
+        await this.reconcileWithChrome();
+        this.initialized = true;
+    }
+    startTabGroupChangeListener() {
+        if (this.isTabGroupListenerStarted)
+            return;
+        const manager = D();
+        this.tabGroupListenerSubscriptionId = manager.subscribe("all", ["groupId"], async (tabId, changeInfo) => {
+            if ("groupId" in changeInfo) {
+                await this.handleTabGroupChange(tabId, changeInfo.groupId);
+            }
+        });
+        this.isTabGroupListenerStarted = true;
+    }
+    stopTabGroupChangeListener() {
+        if (!this.isTabGroupListenerStarted || !this.tabGroupListenerSubscriptionId)
+            return;
+        D().unsubscribe(this.tabGroupListenerSubscriptionId);
+        this.tabGroupListenerSubscriptionId = null;
+        this.isTabGroupListenerStarted = false;
+    }
+    async handleTabGroupChange(tabId, newGroupId) {
+        // Check if tab was removed from a managed group
+        for (const [mainTabId, metadata] of this.groupMetadata.entries()) {
+            if (metadata.memberStates.has(tabId)) {
+                if (newGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE ||
+                    newGroupId !== metadata.chromeGroupId) {
+                    const memberState = metadata.memberStates.get(tabId);
+                    const indicatorState = memberState?.indicatorState || "none";
+                    try {
+                        let messageType = "HIDE_AGENT_INDICATORS";
+                        if (indicatorState === "static") {
+                            messageType = "HIDE_STATIC_INDICATOR";
+                        }
+                        await this.sendIndicatorMessage(tabId, messageType);
+                    }
+                    catch {
+                        // Ignore message errors
+                    }
+                    metadata.memberStates.delete(tabId);
+                    // Handle main tab being removed from group
+                    if (tabId === mainTabId) {
+                        if (this.processingMainTabRemoval.has(mainTabId))
+                            return;
+                        if (this.pendingRegroups.has(mainTabId))
+                            return;
+                        this.processingMainTabRemoval.add(mainTabId);
+                        const currentIndicatorState = metadata.memberStates.get(mainTabId)?.indicatorState || "none";
+                        const oldGroupId = metadata.chromeGroupId;
+                        try {
+                            const newChromeGroupId = await chrome.tabs.group({
+                                tabIds: [mainTabId],
+                            });
+                            await chrome.tabGroups.update(newChromeGroupId, {
+                                title: j,
+                                color: chrome.tabGroups.Color.ORANGE,
+                                collapsed: false,
+                            });
+                            metadata.chromeGroupId = newChromeGroupId;
+                            metadata.memberStates.clear();
+                            metadata.memberStates.set(mainTabId, {
+                                indicatorState: currentIndicatorState,
+                            });
+                            if (oldGroupId !== newChromeGroupId) {
+                                this.groupBlocklistStatuses.delete(oldGroupId);
+                            }
+                            if (currentIndicatorState === "pulsing") {
+                                try {
+                                    await this.sendIndicatorMessage(mainTabId, "SHOW_AGENT_INDICATORS");
+                                }
+                                catch {
+                                    // Ignore message errors
+                                }
+                            }
+                            this.groupMetadata.set(mainTabId, metadata);
+                            await this.saveToStorage();
+                            await this.cleanupOldGroup(oldGroupId, mainTabId);
+                            this.processingMainTabRemoval.delete(mainTabId);
+                            return;
+                        }
+                        catch (error) {
+                            if (error instanceof Error &&
+                                error.message &&
+                                error.message.includes("dragging")) {
+                                this.pendingRegroups.set(mainTabId, {
+                                    tabId: mainTabId,
+                                    originalGroupId: oldGroupId,
+                                    indicatorState: currentIndicatorState,
+                                    metadata,
+                                    attemptCount: 0,
+                                });
+                                this.scheduleRegroupRetry(mainTabId);
+                                return;
+                            }
+                            this.groupMetadata.delete(mainTabId);
+                            this.groupBlocklistStatuses.delete(oldGroupId);
+                            await this.saveToStorage();
+                            this.processingMainTabRemoval.delete(mainTabId);
+                            return;
+                        }
+                    }
+                    await this.saveToStorage();
+                    break;
+                }
+            }
+        }
+        // Check if tab was added to a managed group
+        if (newGroupId && newGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+            for (const [mainTabId, metadata] of this.groupMetadata.entries()) {
+                if (metadata.chromeGroupId === newGroupId) {
+                    if (!metadata.memberStates.has(tabId)) {
+                        const isSecondary = tabId !== mainTabId;
+                        metadata.memberStates.set(tabId, {
+                            indicatorState: isSecondary ? "static" : "none",
+                        });
+                        try {
+                            const tab = await chrome.tabs.get(tabId);
+                            if (tab.url) {
+                                await this.updateTabBlocklistStatus(tabId, tab.url);
+                            }
+                        }
+                        catch {
+                            // Ignore tab get errors
+                        }
+                        const isDismissed = await this.isGroupDismissed(metadata.chromeGroupId);
+                        if (isSecondary && !isDismissed) {
+                            let retryCount = 0;
+                            const maxRetries = 3;
+                            const retryDelay = 500;
+                            const tryShowIndicator = async () => {
+                                try {
+                                    await this.sendIndicatorMessage(tabId, "SHOW_STATIC_INDICATOR");
+                                    return true;
+                                }
+                                catch {
+                                    retryCount++;
+                                    if (retryCount < maxRetries) {
+                                        setTimeout(tryShowIndicator, retryDelay);
+                                    }
+                                    return false;
+                                }
+                            };
+                            await tryShowIndicator();
+                        }
+                        await this.saveToStorage();
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    async cleanupOldGroup(oldGroupId, excludeTabId) {
+        try {
+            const tabs = await chrome.tabs.query({ groupId: oldGroupId });
+            for (const tab of tabs) {
+                if (tab.id && tab.id !== excludeTabId) {
+                    try {
+                        await this.sendIndicatorMessage(tab.id, "HIDE_STATIC_INDICATOR");
+                    }
+                    catch {
+                        // Ignore message errors
+                    }
+                }
+            }
+            const tabIds = tabs
+                .filter((t) => t.id && t.id !== excludeTabId)
+                .map((t) => t.id);
+            if (tabIds.length > 0) {
+                await chrome.tabs.ungroup(tabIds);
+            }
+        }
+        catch {
+            // Ignore cleanup errors
+        }
+    }
+    scheduleRegroupRetry(tabId) {
+        const pending = this.pendingRegroups.get(tabId);
+        if (!pending)
+            return;
+        if (pending.timeoutId) {
+            clearTimeout(pending.timeoutId);
+        }
+        pending.timeoutId = setTimeout(() => {
+            this.attemptRegroup(tabId);
+        }, 1000);
+    }
+    async attemptRegroup(tabId) {
+        const pending = this.pendingRegroups.get(tabId);
+        if (!pending)
+            return;
+        pending.attemptCount++;
+        try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+                this.pendingRegroups.delete(tabId);
+                return;
+            }
+            const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
+            await chrome.tabGroups.update(newGroupId, {
+                title: j,
+                color: chrome.tabGroups.Color.ORANGE,
+                collapsed: false,
+            });
+            pending.metadata.chromeGroupId = newGroupId;
+            pending.metadata.memberStates.clear();
+            pending.metadata.memberStates.set(tabId, {
+                indicatorState: pending.indicatorState,
+            });
+            if (pending.originalGroupId !== newGroupId) {
+                this.groupBlocklistStatuses.delete(pending.originalGroupId);
+            }
+            if (pending.indicatorState === "pulsing") {
                 try {
-                  (await chrome.tabs.sendMessage(t.id, {
-                    type: "HIDE_AGENT_INDICATORS",
-                  }),
-                    await chrome.tabs.sendMessage(t.id, {
-                      type: "HIDE_STATIC_INDICATOR",
-                    }));
-                } catch {}
-          } catch (r) {}
-        (await new Promise((e) => setTimeout(e, 100)),
-          o.length > 0 && (await chrome.tabs.ungroup(o)));
-      } catch (r) {}
-      (this.groupMetadata.delete(e), await this.saveToStorage());
+                    await this.sendIndicatorMessage(tabId, "SHOW_AGENT_INDICATORS");
+                }
+                catch {
+                    // Ignore message errors
+                }
+            }
+            this.groupMetadata.set(tabId, pending.metadata);
+            await this.saveToStorage();
+            await this.cleanupOldGroup(pending.originalGroupId, tabId);
+            this.pendingRegroups.delete(tabId);
+            this.processingMainTabRemoval.delete(tabId);
+        }
+        catch {
+            if (pending.attemptCount < 5) {
+                this.scheduleRegroupRetry(tabId);
+            }
+            else {
+                // Final attempt
+                try {
+                    const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
+                    await chrome.tabGroups.update(newGroupId, {
+                        title: j,
+                        color: chrome.tabGroups.Color.ORANGE,
+                        collapsed: false,
+                    });
+                    pending.metadata.chromeGroupId = newGroupId;
+                    pending.metadata.memberStates.clear();
+                    pending.metadata.memberStates.set(tabId, {
+                        indicatorState: pending.indicatorState,
+                    });
+                    if (pending.originalGroupId !== newGroupId) {
+                        this.groupBlocklistStatuses.delete(pending.originalGroupId);
+                    }
+                    if (pending.indicatorState === "pulsing") {
+                        try {
+                            await this.sendIndicatorMessage(tabId, "SHOW_AGENT_INDICATORS");
+                        }
+                        catch {
+                            // Ignore message errors
+                        }
+                    }
+                    this.groupMetadata.set(tabId, pending.metadata);
+                    await this.saveToStorage();
+                    await this.cleanupOldGroup(pending.originalGroupId, tabId);
+                }
+                catch {
+                    this.groupMetadata.delete(tabId);
+                    this.groupBlocklistStatuses.delete(pending.originalGroupId);
+                    await this.saveToStorage();
+                }
+                this.pendingRegroups.delete(tabId);
+                this.processingMainTabRemoval.delete(tabId);
+            }
+        }
     }
-  }
-  async clearAllGroups() {
-    const e = Array.from(this.groupMetadata.keys());
-    for (const t of e) await this.deleteGroup(t);
-    (this.groupMetadata.clear(), await this.saveToStorage());
-  }
-  async clearAll() {
-    (await this.clearAllGroups(), (this.initialized = !1));
-  }
-  async handleTabClosed(e) {
-    this.groupMetadata.has(e) && (await this.deleteGroup(e));
-  }
-  async getGroup(e) {
-    return (await this.findGroupByMainTab(e)) || void 0;
-  }
-  async updateTabBlocklistStatus(e, t) {
-    const r = await this.findGroupByTab(e);
-    if (!r) return;
-    const o = t.includes("blocked.html"),
-      n = o ? "category1" : await W?.getCategory(t);
-    await this.updateGroupBlocklistStatus(r.chromeGroupId, e, n, o);
-  }
-  async removeTabFromBlocklistTracking(e, t) {
-    const r = this.groupBlocklistStatuses.get(e);
-    r &&
-      (r.categoriesByTab.delete(t),
-      r.blockedHtmlTabs.delete(t),
-      await this.recalculateGroupBlocklistStatus(e));
-  }
-  async updateGroupBlocklistStatus(e, t, r, o = !1) {
-    let n = this.groupBlocklistStatuses.get(e);
-    (n ||
-      ((n = {
-        groupId: e,
-        mostRestrictiveCategory: void 0,
-        categoriesByTab: new Map(),
-        blockedHtmlTabs: new Set(),
-        lastChecked: Date.now(),
-      }),
-      this.groupBlocklistStatuses.set(e, n)),
-      n.categoriesByTab.set(t, r),
-      o ? n.blockedHtmlTabs.add(t) : n.blockedHtmlTabs.delete(t),
-      await this.recalculateGroupBlocklistStatus(e));
-  }
-  async recalculateGroupBlocklistStatus(e) {
-    const t = this.groupBlocklistStatuses.get(e);
-    if (!t) return;
-    const r = t.mostRestrictiveCategory,
-      o = Array.from(t.categoriesByTab.values());
-    ((t.mostRestrictiveCategory = this.getMostRestrictiveCategory(o)),
-      (t.lastChecked = Date.now()),
-      r !== t.mostRestrictiveCategory &&
-        this.notifyBlocklistListeners(e, t.mostRestrictiveCategory));
-  }
-  getMostRestrictiveCategory(e) {
-    const t = {
-      category3: 2,
-      category2: 3,
-      category_org_blocked: 3,
-      category1: 4,
-      category0: 1,
-    };
-    let r,
-      o = 0;
-    for (const n of e) n && t[n] > o && ((o = t[n]), (r = n));
-    return r;
-  }
-  async getGroupBlocklistStatus(e) {
-    await this.initialize();
-    const t = await this.findGroupByMainTab(e);
-    if (!t) {
-      const t = await chrome.tabs.get(e);
-      return await W?.getCategory(t.url || "");
-    }
-    const r = this.groupBlocklistStatuses.get(t.chromeGroupId);
-    return (
-      (!r || Date.now() - r.lastChecked > 5e3) &&
-        (await this.checkAllTabsInGroupForBlocklist(t.chromeGroupId)),
-      this.groupBlocklistStatuses.get(t.chromeGroupId)?.mostRestrictiveCategory
-    );
-  }
-  async getBlockedTabsInfo(e) {
-    await this.initialize();
-    const t = await this.findGroupByMainTab(e),
-      r = [];
-    let o = !1;
-    if (!t) {
-      const t = await chrome.tabs.get(e);
-      if (t.url?.includes("blocked.html"))
-        ((o = !0),
-          r.push({
-            tabId: e,
-            title: t.title || "Untitled",
-            url: t.url || "",
-            category: "category1",
-          }));
-      else {
-        const n = await W?.getCategory(t.url || "");
-        n &&
-          "category0" !== n &&
-          ((o = !0),
-          r.push({
-            tabId: e,
-            title: t.title || "Untitled",
-            url: t.url || "",
-            category: n,
-          }));
-      }
-      return { isMainTabBlocked: o, blockedTabs: r };
-    }
-    const n = this.groupBlocklistStatuses.get(t.chromeGroupId);
-    (!n || Date.now() - n.lastChecked > 5e3) &&
-      (await this.checkAllTabsInGroupForBlocklist(t.chromeGroupId));
-    const i = this.groupBlocklistStatuses.get(t.chromeGroupId);
-    if (!i) return { isMainTabBlocked: o, blockedTabs: r };
-    for (const a of i.blockedHtmlTabs)
-      try {
-        const t = await chrome.tabs.get(a);
-        (r.push({
-          tabId: a,
-          title: t.title || "Untitled",
-          url: t.url || "",
-          category: "category1",
-        }),
-          a === e && (o = !0));
-      } catch {}
-    for (const [a, s] of i.categoriesByTab.entries())
-      if (
-        s &&
-        ("category1" === s ||
-          "category2" === s ||
-          "category_org_blocked" === s) &&
-        !i.blockedHtmlTabs.has(a)
-      )
+    async loadFromStorage() {
         try {
-          const t = await chrome.tabs.get(a);
-          (r.push({
-            tabId: a,
-            title: t.title || "Untitled",
-            url: t.url || "",
-            category: s,
-          }),
-            a === e && (o = !0));
-        } catch {}
-    return { isMainTabBlocked: o, blockedTabs: r };
-  }
-  async checkAllTabsInGroupForBlocklist(e) {
-    const t = await chrome.tabs.query({ groupId: e }),
-      r = {
-        groupId: e,
-        mostRestrictiveCategory: void 0,
-        categoriesByTab: new Map(),
-        blockedHtmlTabs: new Set(),
-        lastChecked: Date.now(),
-      };
-    for (const o of t)
-      if (o.id && o.url)
-        if (o.url.includes("blocked.html"))
-          (r.blockedHtmlTabs.add(o.id),
-            r.categoriesByTab.set(o.id, "category1"));
-        else {
-          const e = await W?.getCategory(o.url);
-          r.categoriesByTab.set(o.id, e);
+            const stored = (await chrome.storage.local.get(this.STORAGE_KEY))[this.STORAGE_KEY];
+            if (stored && typeof stored === "object") {
+                this.groupMetadata = new Map(Object.entries(stored).map(([key, value]) => {
+                    const metadata = value;
+                    if (metadata.memberStates &&
+                        typeof metadata.memberStates === "object" &&
+                        !(metadata.memberStates instanceof Map)) {
+                        metadata.memberStates = new Map(Object.entries(metadata.memberStates).map(([k, v]) => [
+                            parseInt(k),
+                            v,
+                        ]));
+                    }
+                    else if (!metadata.memberStates) {
+                        metadata.memberStates = new Map();
+                    }
+                    return [parseInt(key), metadata];
+                }));
+            }
         }
-    ((r.mostRestrictiveCategory = this.getMostRestrictiveCategory(
-      Array.from(r.categoriesByTab.values()),
-    )),
-      this.groupBlocklistStatuses.set(e, r),
-      this.notifyBlocklistListeners(e, r.mostRestrictiveCategory));
-  }
-  addBlocklistListener(e) {
-    this.blocklistListeners.add(e);
-  }
-  removeBlocklistListener(e) {
-    this.blocklistListeners.delete(e);
-  }
-  notifyBlocklistListeners(e, t) {
-    for (const o of this.blocklistListeners)
-      try {
-        o(e, t);
-      } catch (r) {}
-  }
-  clearBlocklistCache() {
-    this.groupBlocklistStatuses.clear();
-  }
-  async isTabInSameGroup(e, t) {
-    try {
-      await this.initialize();
-      const r = await this.getMainTabId(e);
-      if (!r) return e === t;
-      return r === (await this.getMainTabId(t));
-    } catch (r) {
-      return !1;
+        catch {
+            // Ignore storage errors
+        }
     }
-  }
-  async getValidTabIds(e) {
-    try {
-      await this.initialize();
-      const t = await this.getMainTabId(e);
-      if (!t) return [e];
-      return (await this.getGroupDetails(t)).memberTabs.map((e) => e.tabId);
-    } catch (t) {
-      return [e];
-    }
-  }
-  async getValidTabsWithMetadata(e) {
-    try {
-      const t = await this.getValidTabIds(e);
-      return await Promise.all(
-        t.map(async (e) => {
-          try {
-            const t = await chrome.tabs.get(e);
-            return { id: e, title: t.title || "Untitled", url: t.url || "" };
-          } catch (t) {
-            return { id: e, title: "Error loading tab", url: "" };
-          }
-        }),
-      );
-    } catch (t) {
-      try {
-        const t = await chrome.tabs.get(e);
-        return [{ id: e, title: t.title || "Untitled", url: t.url || "" }];
-      } catch {
-        return [{ id: e, title: "Error loading tab", url: "" }];
-      }
-    }
-  }
-  async getEffectiveTabId(e, t) {
-    if (void 0 === e) return t;
-    if (!(await this.isTabInSameGroup(t, e))) {
-      const r = await this.getValidTabIds(t);
-      throw new Error(
-        `Tab ${e} is not in the same group as the current tab. Valid tab IDs are: ${r.join(", ")}`,
-      );
-    }
-    return e;
-  }
-  async setTabIndicatorState(e, t, r) {
-    let o,
-      n = !1;
-    for (const [, i] of this.groupMetadata.entries()) {
-      if (
-        (await this.getGroupMembers(i.chromeGroupId)).some((t) => t.tabId === e)
-      ) {
-        if (
-          ((o = i.chromeGroupId),
-          "static" === t && (await this.isGroupDismissed(o)))
-        )
-          return;
-        const a = i.memberStates.get(e);
-        (i.memberStates.set(e, {
-          indicatorState: t,
-          previousIndicatorState: a?.indicatorState,
-          isMcp: r ?? a?.isMcp,
-        }),
-          (n = !0));
-        break;
-      }
-    }
-    this.queueIndicatorUpdate(e, t);
-  }
-  async setGroupIndicatorState(e, t) {
-    const r = await this.getGroupDetails(e);
-    "pulsing" === t
-      ? await this.setTabIndicatorState(e, "pulsing")
-      : await this.setTabIndicatorState(e, t);
-    for (const o of r.memberTabs)
-      if (o.tabId !== e) {
-        const e = "none" === t ? "none" : "static";
-        await this.setTabIndicatorState(o.tabId, e);
-      }
-  }
-  getTabIndicatorState(e) {
-    for (const [, t] of this.groupMetadata.entries()) {
-      const r = t.memberStates.get(e);
-      if (r) return r.indicatorState;
-    }
-    return "none";
-  }
-  async showSecondaryTabIndicators(e) {
-    const t = await this.getGroupDetails(e);
-    if (!(await this.isGroupDismissed(t.chromeGroupId))) {
-      for (const r of t.memberTabs)
-        r.tabId !== e && (await this.setTabIndicatorState(r.tabId, "static"));
-      await this.processIndicatorQueue();
-    }
-  }
-  async showStaticIndicatorsForChromeGroup(e) {
-    if (await this.isGroupDismissed(e)) return;
-    const t = await chrome.tabs.query({ groupId: e });
-    if (0 === t.length) return;
-    let r;
-    for (const [n, i] of this.groupMetadata.entries())
-      if (i.chromeGroupId === e) {
-        r = n;
-        break;
-      }
-    r || (t.sort((e, t) => e.index - t.index), (r = t[0].id));
-    for (const n of t)
-      if (n.id && n.id !== r)
+    async saveToStorage() {
         try {
-          await chrome.tabs.sendMessage(n.id, {
-            type: "SHOW_STATIC_INDICATOR",
-          });
-        } catch (o) {}
-  }
-  async hideSecondaryTabIndicators(e) {
-    try {
-      const t = await this.getGroupDetails(e);
-      for (const r of t.memberTabs)
-        r.tabId !== e && (await this.setTabIndicatorState(r.tabId, "none"));
-      await this.processIndicatorQueue();
-    } catch (t) {}
-  }
-  async hideIndicatorForToolUse(e) {
-    try {
-      const t = this.getTabIndicatorState(e);
-      for (const [, r] of this.groupMetadata.entries()) {
-        const o = r.memberStates.get(e);
-        if (o) {
-          ((o.previousIndicatorState = t),
-            (o.indicatorState = "hidden_for_screenshot"));
-          break;
+            const serialized = Object.fromEntries(Array.from(this.groupMetadata.entries()).map(([key, metadata]) => [
+                key,
+                {
+                    ...metadata,
+                    memberStates: Object.fromEntries(metadata.memberStates || new Map()),
+                },
+            ]));
+            await chrome.storage.local.set({ [this.STORAGE_KEY]: serialized });
         }
-      }
-      await this.sendIndicatorMessage(e, "HIDE_FOR_TOOL_USE");
-    } catch (t) {}
-  }
-  async restoreIndicatorAfterToolUse(e) {
-    try {
-      for (const [, t] of this.groupMetadata.entries()) {
-        const r = t.memberStates.get(e);
-        if (r && void 0 !== r.previousIndicatorState) {
-          const o = r.previousIndicatorState;
-          if (
-            ((r.indicatorState = o),
-            delete r.previousIndicatorState,
-            "static" === o)
-          ) {
-            if (await this.isGroupDismissed(t.chromeGroupId)) return;
-          }
-          let n;
-          switch (o) {
-            case "pulsing":
-              n = "SHOW_AGENT_INDICATORS";
-              break;
-            case "static":
-              n = "SHOW_STATIC_INDICATOR";
-              break;
-            case "none":
-              return;
-            default:
-              n = "SHOW_AFTER_TOOL_USE";
-          }
-          await this.sendIndicatorMessage(e, n);
-          break;
+        catch {
+            // Ignore storage errors
         }
-      }
-    } catch (t) {}
-  }
-  async startRunning(e) {
-    await this.setGroupIndicatorState(e, "pulsing");
-  }
-  async stopRunning() {
-    for (const [, e] of this.groupMetadata.entries())
-      for (const [t] of e.memberStates)
-        await this.setTabIndicatorState(t, "none");
-    await this.processIndicatorQueue();
-  }
-  async updateGroupTitle(e, t, r = !1) {
-    if (!t || "" === t.trim()) return;
-    const o = this.groupMetadata.get(e);
-    if (o)
-      try {
-        if ((await chrome.tabGroups.get(o.chromeGroupId)).title !== j) return;
-        const e = (await chrome.tabGroups.query({}))
-            .filter((e) => e.id !== o.chromeGroupId)
-            .map((e) => e.color),
-          n = [
-            chrome.tabGroups.Color.GREY,
-            chrome.tabGroups.Color.BLUE,
-            chrome.tabGroups.Color.RED,
-            chrome.tabGroups.Color.YELLOW,
-            chrome.tabGroups.Color.GREEN,
-            chrome.tabGroups.Color.PINK,
-            chrome.tabGroups.Color.PURPLE,
-            chrome.tabGroups.Color.CYAN,
-            chrome.tabGroups.Color.ORANGE,
-          ],
-          i = n.filter((t) => !e.includes(t));
-        let a;
-        if (i.length > 0) a = i[0];
+    }
+    findMainTabInChromeGroup(chromeGroupId) {
+        for (const [mainTabId, metadata] of this.groupMetadata.entries()) {
+            if (metadata.chromeGroupId === chromeGroupId) {
+                return mainTabId;
+            }
+        }
+        return null;
+    }
+    async createGroup(tabId) {
+        const existing = await this.findGroupByMainTab(tabId);
+        if (existing)
+            return existing;
+        const tab = await chrome.tabs.get(tabId);
+        let chromeGroupId;
+        let domain = "blank";
+        if (tab.url && tab.url !== "" && !tab.url.startsWith("chrome://")) {
+            try {
+                domain = new URL(tab.url).hostname || "blank";
+            }
+            catch {
+                domain = "blank";
+            }
+        }
+        // Ungroup if already in a different managed group
+        if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+            if (!this.findMainTabInChromeGroup(tab.groupId)) {
+                await chrome.tabs.ungroup([tabId]);
+            }
+        }
+        // Retry group creation
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                chromeGroupId = await chrome.tabs.group({ tabIds: [tabId] });
+                break;
+            }
+            catch (error) {
+                retries--;
+                if (retries === 0)
+                    throw error;
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+        }
+        if (!chromeGroupId) {
+            throw new Error("Failed to create Chrome tab group");
+        }
+        await chrome.tabGroups.update(chromeGroupId, {
+            title: j,
+            color: chrome.tabGroups.Color.ORANGE,
+            collapsed: false,
+        });
+        const metadata = {
+            mainTabId: tabId,
+            createdAt: Date.now(),
+            domain,
+            chromeGroupId,
+            memberStates: new Map(),
+        };
+        metadata.memberStates.set(tabId, { indicatorState: "none" });
+        this.groupMetadata.set(tabId, metadata);
+        await this.saveToStorage();
+        const memberTabs = await this.getGroupMembers(chromeGroupId);
+        return { ...metadata, memberTabs };
+    }
+    async adoptOrphanedGroup(tabId, chromeGroupId) {
+        const existing = await this.findGroupByMainTab(tabId);
+        if (existing)
+            return existing;
+        const tab = await chrome.tabs.get(tabId);
+        if (!tab.url)
+            throw new Error("Tab has no URL");
+        const domain = new URL(tab.url).hostname;
+        if (tab.groupId !== chromeGroupId) {
+            throw new Error(`Tab ${tabId} is not in Chrome group ${chromeGroupId}`);
+        }
+        const metadata = {
+            mainTabId: tabId,
+            createdAt: Date.now(),
+            domain,
+            chromeGroupId,
+            memberStates: new Map(),
+        };
+        metadata.memberStates.set(tabId, { indicatorState: "none" });
+        const groupTabs = await chrome.tabs.query({ groupId: chromeGroupId });
+        for (const groupTab of groupTabs) {
+            if (groupTab.id && groupTab.id !== tabId) {
+                metadata.memberStates.set(groupTab.id, { indicatorState: "static" });
+            }
+        }
+        this.groupMetadata.set(tabId, metadata);
+        await this.saveToStorage();
+        const memberTabs = await this.getGroupMembers(chromeGroupId);
+        return { ...metadata, memberTabs };
+    }
+    async addTabToGroup(mainTabId, tabId) {
+        const metadata = this.groupMetadata.get(mainTabId);
+        if (!metadata)
+            return;
+        try {
+            await chrome.tabs.group({
+                tabIds: [tabId],
+                groupId: metadata.chromeGroupId,
+            });
+            if (!metadata.memberStates.has(tabId)) {
+                metadata.memberStates.set(tabId, {
+                    indicatorState: tabId === mainTabId ? "none" : "static",
+                });
+            }
+            try {
+                const tab = await chrome.tabs.get(tabId);
+                if (tab.url) {
+                    await this.updateTabBlocklistStatus(tabId, tab.url);
+                }
+            }
+            catch {
+                // Ignore tab get errors
+            }
+            const isDismissed = await this.isGroupDismissed(metadata.chromeGroupId);
+            if (tabId !== mainTabId && !isDismissed) {
+                try {
+                    await chrome.tabs.sendMessage(tabId, { type: "SHOW_STATIC_INDICATOR" });
+                }
+                catch {
+                    // Ignore message errors
+                }
+            }
+        }
+        catch {
+            // Ignore group errors
+        }
+        await this.saveToStorage();
+    }
+    async getGroupMembers(chromeGroupId) {
+        const tabs = await chrome.tabs.query({ groupId: chromeGroupId });
+        let metadata;
+        for (const [, meta] of this.groupMetadata.entries()) {
+            if (meta.chromeGroupId === chromeGroupId) {
+                metadata = meta;
+                break;
+            }
+        }
+        return tabs
+            .filter((tab) => tab.id !== undefined)
+            .map((tab) => {
+            const tabId = tab.id;
+            const memberState = metadata?.memberStates.get(tabId);
+            return {
+                tabId,
+                url: tab.url || "",
+                title: tab.title || "",
+                joinedAt: Date.now(),
+                indicatorState: memberState?.indicatorState || "none",
+            };
+        });
+    }
+    async getGroupDetails(mainTabId) {
+        const metadata = this.groupMetadata.get(mainTabId);
+        if (!metadata) {
+            throw new Error(`No group found for main tab ${mainTabId}`);
+        }
+        const memberTabs = await this.getGroupMembers(metadata.chromeGroupId);
+        return { ...metadata, memberTabs };
+    }
+    async findOrphanedTabs() {
+        const orphaned = [];
+        const seen = new Set();
+        const ungroupedTabs = await chrome.tabs.query({
+            groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
+        });
+        const managedTabIds = new Set();
+        for (const [mainTabId] of this.groupMetadata.entries()) {
+            managedTabIds.add(mainTabId);
+            const group = await this.findGroupByMainTab(mainTabId);
+            if (group) {
+                group.memberTabs.forEach((member) => managedTabIds.add(member.tabId));
+            }
+        }
+        for (const tab of ungroupedTabs) {
+            if (!tab.id || seen.has(tab.id) || managedTabIds.has(tab.id))
+                continue;
+            seen.add(tab.id);
+            if (tab.openerTabId &&
+                managedTabIds.has(tab.openerTabId) &&
+                tab.url &&
+                !tab.url.startsWith("chrome://") &&
+                !tab.url.startsWith("chrome-extension://") &&
+                tab.url !== "about:blank") {
+                orphaned.push({
+                    tabId: tab.id,
+                    url: tab.url || "",
+                    title: tab.title || "",
+                    openerTabId: tab.openerTabId,
+                    detectedAt: Date.now(),
+                });
+            }
+        }
+        return orphaned;
+    }
+    async reconcileWithChrome() {
+        const allTabs = await chrome.tabs.query({});
+        const activeGroupIds = new Set();
+        for (const tab of allTabs) {
+            if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+                activeGroupIds.add(tab.groupId);
+            }
+        }
+        const toRemove = [];
+        let needsSave = false;
+        for (const [mainTabId, metadata] of this.groupMetadata.entries()) {
+            try {
+                const tab = await chrome.tabs.get(mainTabId);
+                if (!activeGroupIds.has(metadata.chromeGroupId)) {
+                    toRemove.push(mainTabId);
+                }
+                else if (tab.groupId !== metadata.chromeGroupId) {
+                    toRemove.push(mainTabId);
+                }
+                else {
+                    // Clean up stale member states
+                    const groupTabs = await chrome.tabs.query({
+                        groupId: metadata.chromeGroupId,
+                    });
+                    const currentTabIds = new Set(groupTabs.map((t) => t.id).filter((id) => id !== undefined));
+                    const staleMembers = [];
+                    for (const [memberId] of metadata.memberStates) {
+                        if (!currentTabIds.has(memberId)) {
+                            staleMembers.push(memberId);
+                        }
+                    }
+                    if (staleMembers.length > 0) {
+                        for (const memberId of staleMembers) {
+                            metadata.memberStates.delete(memberId);
+                            try {
+                                await this.sendIndicatorMessage(memberId, "HIDE_AGENT_INDICATORS");
+                            }
+                            catch {
+                                // Ignore message errors
+                            }
+                        }
+                        needsSave = true;
+                    }
+                }
+            }
+            catch {
+                toRemove.push(mainTabId);
+            }
+        }
+        for (const mainTabId of toRemove) {
+            this.groupMetadata.delete(mainTabId);
+        }
+        if (toRemove.length > 0 || needsSave) {
+            await this.saveToStorage();
+        }
+    }
+    async getAllGroups() {
+        await this.initialize();
+        const groups = [];
+        for (const [, metadata] of this.groupMetadata.entries()) {
+            try {
+                const memberTabs = await this.getGroupMembers(metadata.chromeGroupId);
+                groups.push({ ...metadata, memberTabs });
+            }
+            catch {
+                // Ignore errors for individual groups
+            }
+        }
+        return groups;
+    }
+    async findGroupByTab(tabId) {
+        await this.initialize();
+        // Check if this is a main tab
+        const mainTabMetadata = this.groupMetadata.get(tabId);
+        if (mainTabMetadata) {
+            const memberTabs = await this.getGroupMembers(mainTabMetadata.chromeGroupId);
+            return { ...mainTabMetadata, memberTabs };
+        }
+        // Check if tab is in a managed group
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+            return null;
+        }
+        for (const [, metadata] of this.groupMetadata.entries()) {
+            if (metadata.chromeGroupId === tab.groupId) {
+                const memberTabs = await this.getGroupMembers(metadata.chromeGroupId);
+                return { ...metadata, memberTabs };
+            }
+        }
+        // Tab is in an unmanaged Chrome group
+        const groupTabs = await chrome.tabs.query({ groupId: tab.groupId });
+        if (groupTabs.length === 0)
+            return null;
+        groupTabs.sort((a, b) => a.index - b.index);
+        const firstTab = groupTabs[0];
+        if (!firstTab.id || !firstTab.url)
+            return null;
+        return {
+            mainTabId: firstTab.id,
+            createdAt: Date.now(),
+            domain: new URL(firstTab.url).hostname,
+            chromeGroupId: tab.groupId,
+            memberStates: new Map(),
+            memberTabs: groupTabs
+                .filter((t) => t.id !== undefined)
+                .map((t) => ({
+                tabId: t.id,
+                url: t.url || "",
+                title: t.title || "",
+                joinedAt: Date.now(),
+            })),
+            isUnmanaged: true,
+        };
+    }
+    async findGroupByMainTab(mainTabId) {
+        await this.initialize();
+        const metadata = this.groupMetadata.get(mainTabId);
+        if (!metadata)
+            return null;
+        try {
+            const memberTabs = await this.getGroupMembers(metadata.chromeGroupId);
+            return { ...metadata, memberTabs };
+        }
+        catch {
+            return null;
+        }
+    }
+    async isInGroup(tabId) {
+        return (await this.findGroupByTab(tabId)) !== null;
+    }
+    isMainTab(tabId) {
+        return this.groupMetadata.has(tabId);
+    }
+    async getMainTabId(tabId) {
+        const group = await this.findGroupByTab(tabId);
+        return group?.mainTabId || null;
+    }
+    async promoteToMainTab(currentMainTabId, newMainTabId) {
+        const metadata = this.groupMetadata.get(currentMainTabId);
+        if (!metadata) {
+            throw new Error(`No group found for main tab ${currentMainTabId}`);
+        }
+        const newMainTab = await chrome.tabs.get(newMainTabId);
+        if (newMainTab.groupId !== metadata.chromeGroupId) {
+            throw new Error(`Tab ${newMainTabId} is not in the same group as ${currentMainTabId}`);
+        }
+        const oldMainState = metadata.memberStates.get(currentMainTabId) || {
+            indicatorState: "none",
+        };
+        // Hide indicator on old main tab
+        try {
+            await chrome.tabs.get(currentMainTabId);
+            if (oldMainState.indicatorState === "pulsing") {
+                await this.sendIndicatorMessage(currentMainTabId, "HIDE_AGENT_INDICATORS");
+            }
+        }
+        catch {
+            // Tab may not exist
+        }
+        metadata.memberStates.get(newMainTabId);
+        metadata.mainTabId = newMainTabId;
+        // Hide static indicator on new main tab
+        try {
+            await this.sendIndicatorMessage(newMainTabId, "HIDE_STATIC_INDICATOR");
+            metadata.memberStates.delete(newMainTabId);
+        }
+        catch {
+            // Ignore message errors
+        }
+        // Transfer indicator state
+        if (oldMainState.indicatorState === "pulsing") {
+            metadata.memberStates.set(newMainTabId, { indicatorState: "pulsing" });
+            await this.sendIndicatorMessage(newMainTabId, "SHOW_AGENT_INDICATORS");
+        }
         else {
-          const t = new Map();
-          (n.forEach((e) => t.set(e, 0)),
-            e.forEach((e) => {
-              t.set(e, (t.get(e) || 0) + 1);
+            metadata.memberStates.set(newMainTabId, { indicatorState: "none" });
+        }
+        this.groupMetadata.delete(currentMainTabId);
+        this.groupMetadata.set(newMainTabId, metadata);
+        await this.saveToStorage();
+    }
+    async deleteGroup(mainTabId) {
+        const metadata = this.groupMetadata.get(mainTabId);
+        if (!metadata)
+            return;
+        try {
+            const tabs = await chrome.tabs.query({ groupId: metadata.chromeGroupId });
+            const tabIds = tabs.map((t) => t.id).filter((id) => id !== undefined);
+            if (tabIds.length > 0) {
+                try {
+                    for (const tab of tabs) {
+                        if (tab.id) {
+                            try {
+                                await chrome.tabs.sendMessage(tab.id, {
+                                    type: "HIDE_AGENT_INDICATORS",
+                                });
+                                await chrome.tabs.sendMessage(tab.id, {
+                                    type: "HIDE_STATIC_INDICATOR",
+                                });
+                            }
+                            catch {
+                                // Ignore message errors
+                            }
+                        }
+                    }
+                }
+                catch {
+                    // Ignore errors
+                }
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                if (tabIds.length > 0) {
+                    await chrome.tabs.ungroup(tabIds);
+                }
+            }
+        }
+        catch {
+            // Ignore ungroup errors
+        }
+        this.groupMetadata.delete(mainTabId);
+        await this.saveToStorage();
+    }
+    async clearAllGroups() {
+        const mainTabIds = Array.from(this.groupMetadata.keys());
+        for (const mainTabId of mainTabIds) {
+            await this.deleteGroup(mainTabId);
+        }
+        this.groupMetadata.clear();
+        await this.saveToStorage();
+    }
+    async clearAll() {
+        await this.clearAllGroups();
+        this.initialized = false;
+    }
+    async handleTabClosed(tabId) {
+        if (this.groupMetadata.has(tabId)) {
+            await this.deleteGroup(tabId);
+        }
+    }
+    async getGroup(mainTabId) {
+        return (await this.findGroupByMainTab(mainTabId)) || undefined;
+    }
+    async updateTabBlocklistStatus(tabId, url) {
+        const group = await this.findGroupByTab(tabId);
+        if (!group)
+            return;
+        const isBlockedHtml = url.includes("blocked.html");
+        const category = isBlockedHtml
+            ? "category1"
+            : await W?.getCategory(url);
+        await this.updateGroupBlocklistStatus(group.chromeGroupId, tabId, category, isBlockedHtml);
+    }
+    async removeTabFromBlocklistTracking(groupId, tabId) {
+        const status = this.groupBlocklistStatuses.get(groupId);
+        if (!status)
+            return;
+        status.categoriesByTab.delete(tabId);
+        status.blockedHtmlTabs.delete(tabId);
+        await this.recalculateGroupBlocklistStatus(groupId);
+    }
+    async updateGroupBlocklistStatus(groupId, tabId, category, isBlockedHtml = false) {
+        let status = this.groupBlocklistStatuses.get(groupId);
+        if (!status) {
+            status = {
+                groupId,
+                mostRestrictiveCategory: undefined,
+                categoriesByTab: new Map(),
+                blockedHtmlTabs: new Set(),
+                lastChecked: Date.now(),
+            };
+            this.groupBlocklistStatuses.set(groupId, status);
+        }
+        status.categoriesByTab.set(tabId, category);
+        if (isBlockedHtml) {
+            status.blockedHtmlTabs.add(tabId);
+        }
+        else {
+            status.blockedHtmlTabs.delete(tabId);
+        }
+        await this.recalculateGroupBlocklistStatus(groupId);
+    }
+    async recalculateGroupBlocklistStatus(groupId) {
+        const status = this.groupBlocklistStatuses.get(groupId);
+        if (!status)
+            return;
+        const previousCategory = status.mostRestrictiveCategory;
+        const categories = Array.from(status.categoriesByTab.values());
+        status.mostRestrictiveCategory = this.getMostRestrictiveCategory(categories);
+        status.lastChecked = Date.now();
+        if (previousCategory !== status.mostRestrictiveCategory) {
+            this.notifyBlocklistListeners(groupId, status.mostRestrictiveCategory);
+        }
+    }
+    getMostRestrictiveCategory(categories) {
+        const priority = {
+            category3: 2,
+            category2: 3,
+            category_org_blocked: 3,
+            category1: 4,
+            category0: 1,
+        };
+        let mostRestrictive;
+        let highestPriority = 0;
+        for (const category of categories) {
+            if (category && priority[category] > highestPriority) {
+                highestPriority = priority[category];
+                mostRestrictive = category;
+            }
+        }
+        return mostRestrictive;
+    }
+    async getGroupBlocklistStatus(mainTabId) {
+        await this.initialize();
+        const group = await this.findGroupByMainTab(mainTabId);
+        if (!group) {
+            const tab = await chrome.tabs.get(mainTabId);
+            return await W?.getCategory(tab.url || "");
+        }
+        const status = this.groupBlocklistStatuses.get(group.chromeGroupId);
+        if (!status || Date.now() - status.lastChecked > 5000) {
+            await this.checkAllTabsInGroupForBlocklist(group.chromeGroupId);
+        }
+        return this.groupBlocklistStatuses.get(group.chromeGroupId)?.mostRestrictiveCategory;
+    }
+    async getBlockedTabsInfo(mainTabId) {
+        await this.initialize();
+        const group = await this.findGroupByMainTab(mainTabId);
+        const blockedTabs = [];
+        let isMainTabBlocked = false;
+        if (!group) {
+            const tab = await chrome.tabs.get(mainTabId);
+            if (tab.url?.includes("blocked.html")) {
+                isMainTabBlocked = true;
+                blockedTabs.push({
+                    tabId: mainTabId,
+                    title: tab.title || "Untitled",
+                    url: tab.url || "",
+                    category: "category1",
+                });
+            }
+            else {
+                const category = await W?.getCategory(tab.url || "");
+                if (category && category !== "category0") {
+                    isMainTabBlocked = true;
+                    blockedTabs.push({
+                        tabId: mainTabId,
+                        title: tab.title || "Untitled",
+                        url: tab.url || "",
+                        category,
+                    });
+                }
+            }
+            return { isMainTabBlocked, blockedTabs };
+        }
+        const status = this.groupBlocklistStatuses.get(group.chromeGroupId);
+        if (!status || Date.now() - status.lastChecked > 5000) {
+            await this.checkAllTabsInGroupForBlocklist(group.chromeGroupId);
+        }
+        const currentStatus = this.groupBlocklistStatuses.get(group.chromeGroupId);
+        if (!currentStatus) {
+            return { isMainTabBlocked, blockedTabs };
+        }
+        for (const blockedTabId of currentStatus.blockedHtmlTabs) {
+            try {
+                const tab = await chrome.tabs.get(blockedTabId);
+                blockedTabs.push({
+                    tabId: blockedTabId,
+                    title: tab.title || "Untitled",
+                    url: tab.url || "",
+                    category: "category1",
+                });
+                if (blockedTabId === mainTabId) {
+                    isMainTabBlocked = true;
+                }
+            }
+            catch {
+                // Tab may not exist
+            }
+        }
+        for (const [tabId, category] of currentStatus.categoriesByTab.entries()) {
+            if (category &&
+                (category === "category1" ||
+                    category === "category2" ||
+                    category === "category_org_blocked") &&
+                !currentStatus.blockedHtmlTabs.has(tabId)) {
+                try {
+                    const tab = await chrome.tabs.get(tabId);
+                    blockedTabs.push({
+                        tabId,
+                        title: tab.title || "Untitled",
+                        url: tab.url || "",
+                        category,
+                    });
+                    if (tabId === mainTabId) {
+                        isMainTabBlocked = true;
+                    }
+                }
+                catch {
+                    // Tab may not exist
+                }
+            }
+        }
+        return { isMainTabBlocked, blockedTabs };
+    }
+    async checkAllTabsInGroupForBlocklist(groupId) {
+        const tabs = await chrome.tabs.query({ groupId });
+        const status = {
+            groupId,
+            mostRestrictiveCategory: undefined,
+            categoriesByTab: new Map(),
+            blockedHtmlTabs: new Set(),
+            lastChecked: Date.now(),
+        };
+        for (const tab of tabs) {
+            if (tab.id && tab.url) {
+                if (tab.url.includes("blocked.html")) {
+                    status.blockedHtmlTabs.add(tab.id);
+                    status.categoriesByTab.set(tab.id, "category1");
+                }
+                else {
+                    const category = await W?.getCategory(tab.url);
+                    status.categoriesByTab.set(tab.id, category);
+                }
+            }
+        }
+        status.mostRestrictiveCategory = this.getMostRestrictiveCategory(Array.from(status.categoriesByTab.values()));
+        this.groupBlocklistStatuses.set(groupId, status);
+        this.notifyBlocklistListeners(groupId, status.mostRestrictiveCategory);
+    }
+    addBlocklistListener(listener) {
+        this.blocklistListeners.add(listener);
+    }
+    removeBlocklistListener(listener) {
+        this.blocklistListeners.delete(listener);
+    }
+    notifyBlocklistListeners(groupId, category) {
+        for (const listener of this.blocklistListeners) {
+            try {
+                listener(groupId, category);
+            }
+            catch {
+                // Ignore listener errors
+            }
+        }
+    }
+    clearBlocklistCache() {
+        this.groupBlocklistStatuses.clear();
+    }
+    async isTabInSameGroup(tabId1, tabId2) {
+        try {
+            await this.initialize();
+            const mainTabId1 = await this.getMainTabId(tabId1);
+            if (!mainTabId1)
+                return tabId1 === tabId2;
+            const mainTabId2 = await this.getMainTabId(tabId2);
+            return mainTabId1 === mainTabId2;
+        }
+        catch {
+            return false;
+        }
+    }
+    async getValidTabIds(tabId) {
+        try {
+            await this.initialize();
+            const mainTabId = await this.getMainTabId(tabId);
+            if (!mainTabId)
+                return [tabId];
+            const details = await this.getGroupDetails(mainTabId);
+            return details.memberTabs.map((member) => member.tabId);
+        }
+        catch {
+            return [tabId];
+        }
+    }
+    async getValidTabsWithMetadata(tabId) {
+        try {
+            const validTabIds = await this.getValidTabIds(tabId);
+            return await Promise.all(validTabIds.map(async (id) => {
+                try {
+                    const tab = await chrome.tabs.get(id);
+                    return { id, title: tab.title || "Untitled", url: tab.url || "" };
+                }
+                catch {
+                    return { id, title: "Error loading tab", url: "" };
+                }
             }));
-          let r = 1 / 0;
-          a = chrome.tabGroups.Color.ORANGE;
-          for (const [e, o] of t.entries()) o < r && ((r = o), (a = e));
         }
-        const s = r ? `\u231B${t.trim()}` : t.trim();
-        await chrome.tabGroups.update(o.chromeGroupId, { title: s, color: a });
-      } catch (n) {}
-  }
-  async updateTabGroupPrefix(e, t, r) {
-    const o = this.groupMetadata.get(e);
-    if (!o) return;
-    let n = 0;
-    const i = /^(\u231B|\uD83D\uDD14|\u2705)/,
-      a = async () => {
-        try {
-          const e = (await chrome.tabGroups.get(o.chromeGroupId)).title || "";
-          if (r && !e.startsWith(r)) return;
-          if (t && e.startsWith(t)) return;
-          if (!t && !e.match(i)) return;
-          const n = e.replace(i, "").trim(),
-            a = t ? `${t}${n}` : n;
-          await chrome.tabGroups.update(o.chromeGroupId, { title: a });
-        } catch (e) {
-          if ((n++, n <= 3)) {
-            return (await new Promise((e) => setTimeout(e, 500)), a());
-          }
-        }
-      };
-    await a();
-  }
-  async addCompletionPrefix(e) {
-    await this.updateTabGroupPrefix(e, "\u2705");
-  }
-  async addLoadingPrefix(e) {
-    await this.updateTabGroupPrefix(e, "\u231B");
-  }
-  async addPermissionPrefix(e) {
-    await this.updateTabGroupPrefix(e, "\uD83D\uDD14");
-  }
-  async removeCompletionPrefix(e) {
-    await this.updateTabGroupPrefix(e, null, "\u2705");
-  }
-  async removePrefix(e) {
-    await this.updateTabGroupPrefix(e, null);
-  }
-  async addTabToIndicatorGroup(e) {
-    const { tabId: t, isRunning: r, isMcp: o } = e;
-    let n;
-    ((n = this.isMainTab(t) && r ? "pulsing" : "static"),
-      await this.setTabIndicatorState(t, n, o));
-  }
-  async getTabForMcp(e, t) {
-    if ((await this.initialize(), await this.loadMcpTabGroupId(), void 0 !== e))
-      try {
-        const t = await chrome.tabs.get(e);
-        if (t) {
-          const r = await this.findGroupByTab(e);
-          let o;
-          if (
-            (r &&
-              ((this.mcpTabGroupId = r.chromeGroupId),
-              await this.saveMcpTabGroupId(),
-              await this.ensureMcpGroupCharacteristics(r.chromeGroupId)),
-            t.url && !t.url.startsWith("chrome://"))
-          )
+        catch {
             try {
-              o = new URL(t.url).hostname || void 0;
-            } catch {}
-          return { tabId: e, domain: o };
+                const tab = await chrome.tabs.get(tabId);
+                return [{ id: tabId, title: tab.title || "Untitled", url: tab.url || "" }];
+            }
+            catch {
+                return [{ id: tabId, title: "Error loading tab", url: "" }];
+            }
         }
-      } catch {
-        throw new Error(`Tab ${e} does not exist`);
-      }
-    if (void 0 !== t) {
-      for (const [e, r] of this.groupMetadata.entries())
-        if (r.chromeGroupId === t)
-          try {
-            if (await chrome.tabs.get(e)) return { tabId: e, domain: r.domain };
-          } catch {
-            break;
-          }
-      try {
-        const e = await chrome.tabs.query({ groupId: t });
-        if (e.length > 0 && e[0].id) {
-          let t;
-          const r = e[0].url;
-          if (r && !r.startsWith("chrome://"))
-            try {
-              t = new URL(r).hostname || void 0;
-            } catch {}
-          return { tabId: e[0].id, domain: t };
-        }
-      } catch (r) {}
-      throw new Error(`Could not find tab group ${t}`);
     }
-    return { tabId: void 0 };
-  }
-  async isTabMcp(e) {
-    if (
-      !(
-        !0 ===
-        (await chrome.storage.local.get(o.MCP_CONNECTED))[o.MCP_CONNECTED]
-      )
-    )
-      return !1;
-    if ((await this.loadMcpTabGroupId(), null === this.mcpTabGroupId))
-      return !1;
-    for (const [, t] of this.groupMetadata.entries())
-      if (t.chromeGroupId === this.mcpTabGroupId && t.memberStates.has(e))
-        return !0;
-    return !1;
-  }
-  async ensureMcpGroupCharacteristics(e) {
-    try {
-      const t = await chrome.tabGroups.get(e);
-      (t.title === z && t.color === chrome.tabGroups.Color.YELLOW) ||
-        (await chrome.tabGroups.update(e, {
-          title: z,
-          color: chrome.tabGroups.Color.YELLOW,
-        }));
-    } catch (t) {}
-  }
-  async clearMcpTabGroup() {
-    ((this.mcpTabGroupId = null),
-      await chrome.storage.local.remove(this.MCP_TAB_GROUP_KEY));
-  }
-  async getOrCreateMcpTabContext(e) {
-    const { createIfEmpty: t = !1 } = e || {};
-    if ((await this.loadMcpTabGroupId(), null !== this.mcpTabGroupId))
-      try {
-        (await chrome.tabGroups.get(this.mcpTabGroupId),
-          await this.ensureMcpGroupCharacteristics(this.mcpTabGroupId));
-        const e = (await chrome.tabs.query({ groupId: this.mcpTabGroupId }))
-          .filter((e) => void 0 !== e.id)
-          .map((e) => ({ id: e.id, title: e.title || "", url: e.url || "" }));
-        if (e.length > 0)
-          return {
-            currentTabId: e[0].id,
-            availableTabs: e,
-            tabCount: e.length,
-            tabGroupId: this.mcpTabGroupId,
-          };
-      } catch {
-        ((this.mcpTabGroupId = null), await this.saveMcpTabGroupId());
-      }
-    if (t) {
-      const e = await chrome.windows.create({
-          url: "chrome://newtab",
-          focused: !0,
-          type: "normal",
-        }),
-        t = e?.tabs?.[0]?.id;
-      if (!t) throw new Error("Failed to create window with new tab");
-      const r = await this.createGroup(t);
-      return (
-        await chrome.tabGroups.update(r.chromeGroupId, {
-          title: z,
-          color: chrome.tabGroups.Color.YELLOW,
-        }),
-        (this.mcpTabGroupId = r.chromeGroupId),
-        await this.saveMcpTabGroupId(),
-        {
-          currentTabId: t,
-          availableTabs: [{ id: t, title: "New Tab", url: "chrome://newtab" }],
-          tabCount: 1,
-          tabGroupId: r.chromeGroupId,
+    async getEffectiveTabId(requestedTabId, currentTabId) {
+        if (requestedTabId === undefined)
+            return currentTabId;
+        if (!(await this.isTabInSameGroup(currentTabId, requestedTabId))) {
+            const validTabIds = await this.getValidTabIds(currentTabId);
+            throw new Error(`Tab ${requestedTabId} is not in the same group as the current tab. Valid tab IDs are: ${validTabIds.join(", ")}`);
         }
-      );
+        return requestedTabId;
     }
-  }
-  async saveMcpTabGroupId() {
-    await chrome.storage.local.set({
-      [this.MCP_TAB_GROUP_KEY]: this.mcpTabGroupId,
-    });
-  }
-  async loadMcpTabGroupId() {
-    try {
-      const e = (await chrome.storage.local.get(this.MCP_TAB_GROUP_KEY))[
-        this.MCP_TAB_GROUP_KEY
-      ];
-      if ("number" == typeof e)
+    async setTabIndicatorState(tabId, state, isMcp) {
+        let chromeGroupId;
+        for (const [, metadata] of this.groupMetadata.entries()) {
+            const members = await this.getGroupMembers(metadata.chromeGroupId);
+            if (members.some((member) => member.tabId === tabId)) {
+                chromeGroupId = metadata.chromeGroupId;
+                if (state === "static" && (await this.isGroupDismissed(chromeGroupId))) {
+                    return;
+                }
+                const memberState = metadata.memberStates.get(tabId);
+                metadata.memberStates.set(tabId, {
+                    indicatorState: state,
+                    previousIndicatorState: memberState?.indicatorState,
+                    isMcp: isMcp ?? memberState?.isMcp,
+                });
+                break;
+            }
+        }
+        this.queueIndicatorUpdate(tabId, state);
+    }
+    async setGroupIndicatorState(mainTabId, state) {
+        const details = await this.getGroupDetails(mainTabId);
+        if (state === "pulsing") {
+            await this.setTabIndicatorState(mainTabId, "pulsing");
+        }
+        else {
+            await this.setTabIndicatorState(mainTabId, state);
+        }
+        for (const member of details.memberTabs) {
+            if (member.tabId !== mainTabId) {
+                const memberState = state === "none" ? "none" : "static";
+                await this.setTabIndicatorState(member.tabId, memberState);
+            }
+        }
+    }
+    getTabIndicatorState(tabId) {
+        for (const [, metadata] of this.groupMetadata.entries()) {
+            const memberState = metadata.memberStates.get(tabId);
+            if (memberState) {
+                return memberState.indicatorState;
+            }
+        }
+        return "none";
+    }
+    async showSecondaryTabIndicators(mainTabId) {
+        const details = await this.getGroupDetails(mainTabId);
+        if (await this.isGroupDismissed(details.chromeGroupId)) {
+            return;
+        }
+        for (const member of details.memberTabs) {
+            if (member.tabId !== mainTabId) {
+                await this.setTabIndicatorState(member.tabId, "static");
+            }
+        }
+        await this.processIndicatorQueue();
+    }
+    async showStaticIndicatorsForChromeGroup(chromeGroupId) {
+        if (await this.isGroupDismissed(chromeGroupId))
+            return;
+        const tabs = await chrome.tabs.query({ groupId: chromeGroupId });
+        if (tabs.length === 0)
+            return;
+        let mainTabId;
+        for (const [id, metadata] of this.groupMetadata.entries()) {
+            if (metadata.chromeGroupId === chromeGroupId) {
+                mainTabId = id;
+                break;
+            }
+        }
+        if (!mainTabId) {
+            tabs.sort((a, b) => a.index - b.index);
+            mainTabId = tabs[0].id;
+        }
+        for (const tab of tabs) {
+            if (tab.id && tab.id !== mainTabId) {
+                try {
+                    await chrome.tabs.sendMessage(tab.id, {
+                        type: "SHOW_STATIC_INDICATOR",
+                    });
+                }
+                catch {
+                    // Ignore message errors
+                }
+            }
+        }
+    }
+    async hideSecondaryTabIndicators(mainTabId) {
         try {
-          return (await chrome.tabGroups.get(e), void (this.mcpTabGroupId = e));
-        } catch {}
-      const t = await this.findMcpTabGroupByCharacteristics();
-      if (null !== t)
-        return (
-          (this.mcpTabGroupId = t),
-          void (await this.saveMcpTabGroupId())
-        );
-      this.mcpTabGroupId = null;
-    } catch (e) {
-      this.mcpTabGroupId = null;
-    }
-  }
-  async findMcpTabGroupByCharacteristics() {
-    try {
-      const e = await chrome.tabGroups.query({});
-      for (const t of e)
-        if (t.color === chrome.tabGroups.Color.YELLOW && t.title?.includes(z)) {
-          if ((await chrome.tabs.query({ groupId: t.id })).length > 0)
-            return t.id;
+            const details = await this.getGroupDetails(mainTabId);
+            for (const member of details.memberTabs) {
+                if (member.tabId !== mainTabId) {
+                    await this.setTabIndicatorState(member.tabId, "none");
+                }
+            }
+            await this.processIndicatorQueue();
         }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-  queueIndicatorUpdate(e, t) {
-    for (const [, r] of this.groupMetadata.entries()) {
-      const o = r.memberStates.get(e);
-      if (o) {
-        o.pendingUpdate = t;
-        break;
-      }
-    }
-    (this.indicatorUpdateTimer && clearTimeout(this.indicatorUpdateTimer),
-      (this.indicatorUpdateTimer = setTimeout(() => {
-        this.processIndicatorQueue();
-      }, this.INDICATOR_UPDATE_DELAY)));
-  }
-  async processIndicatorQueue() {
-    for (const [, e] of this.groupMetadata.entries())
-      for (const [t, r] of e.memberStates)
-        if (r.pendingUpdate) {
-          let e;
-          switch (r.pendingUpdate) {
-            case "pulsing":
-              e = "SHOW_AGENT_INDICATORS";
-              break;
-            case "static":
-              e = "SHOW_STATIC_INDICATOR";
-              break;
-            case "none":
-              e = "HIDE_AGENT_INDICATORS";
-              break;
-            default:
-              continue;
-          }
-          (await this.sendIndicatorMessage(t, e, r.isMcp),
-            delete r.pendingUpdate);
+        catch {
+            // Ignore errors
         }
-  }
-  async sendIndicatorMessage(e, t, r) {
-    try {
-      await chrome.tabs.sendMessage(e, { type: t, isMcp: r });
-    } catch (o) {
-      throw o;
     }
-  }
+    async hideIndicatorForToolUse(tabId) {
+        try {
+            const currentState = this.getTabIndicatorState(tabId);
+            for (const [, metadata] of this.groupMetadata.entries()) {
+                const memberState = metadata.memberStates.get(tabId);
+                if (memberState) {
+                    memberState.previousIndicatorState = currentState;
+                    memberState.indicatorState = "hidden_for_screenshot";
+                    break;
+                }
+            }
+            await this.sendIndicatorMessage(tabId, "HIDE_FOR_TOOL_USE");
+        }
+        catch {
+            // Ignore errors
+        }
+    }
+    async restoreIndicatorAfterToolUse(tabId) {
+        try {
+            for (const [, metadata] of this.groupMetadata.entries()) {
+                const memberState = metadata.memberStates.get(tabId);
+                if (memberState && memberState.previousIndicatorState !== undefined) {
+                    const previousState = memberState.previousIndicatorState;
+                    memberState.indicatorState = previousState;
+                    delete memberState.previousIndicatorState;
+                    if (previousState === "static") {
+                        if (await this.isGroupDismissed(metadata.chromeGroupId)) {
+                            return;
+                        }
+                    }
+                    let messageType;
+                    switch (previousState) {
+                        case "pulsing":
+                            messageType = "SHOW_AGENT_INDICATORS";
+                            break;
+                        case "static":
+                            messageType = "SHOW_STATIC_INDICATOR";
+                            break;
+                        case "none":
+                            return;
+                        default:
+                            messageType = "SHOW_AFTER_TOOL_USE";
+                    }
+                    await this.sendIndicatorMessage(tabId, messageType);
+                    break;
+                }
+            }
+        }
+        catch {
+            // Ignore errors
+        }
+    }
+    async startRunning(mainTabId) {
+        await this.setGroupIndicatorState(mainTabId, "pulsing");
+    }
+    async stopRunning() {
+        for (const [, metadata] of this.groupMetadata.entries()) {
+            for (const [tabId] of metadata.memberStates) {
+                await this.setTabIndicatorState(tabId, "none");
+            }
+        }
+        await this.processIndicatorQueue();
+    }
+    async updateGroupTitle(mainTabId, title, showLoading = false) {
+        if (!title || title.trim() === "")
+            return;
+        const metadata = this.groupMetadata.get(mainTabId);
+        if (!metadata)
+            return;
+        try {
+            const group = await chrome.tabGroups.get(metadata.chromeGroupId);
+            if (group.title !== j)
+                return;
+            const otherGroups = await chrome.tabGroups.query({});
+            const usedColors = otherGroups
+                .filter((g) => g.id !== metadata.chromeGroupId)
+                .map((g) => g.color);
+            const allColors = [
+                chrome.tabGroups.Color.GREY,
+                chrome.tabGroups.Color.BLUE,
+                chrome.tabGroups.Color.RED,
+                chrome.tabGroups.Color.YELLOW,
+                chrome.tabGroups.Color.GREEN,
+                chrome.tabGroups.Color.PINK,
+                chrome.tabGroups.Color.PURPLE,
+                chrome.tabGroups.Color.CYAN,
+                chrome.tabGroups.Color.ORANGE,
+            ];
+            const availableColors = allColors.filter((c) => !usedColors.includes(c));
+            let selectedColor;
+            if (availableColors.length > 0) {
+                selectedColor = availableColors[0];
+            }
+            else {
+                const colorCounts = new Map();
+                allColors.forEach((c) => colorCounts.set(c, 0));
+                usedColors.forEach((c) => {
+                    colorCounts.set(c, (colorCounts.get(c) || 0) + 1);
+                });
+                let minCount = Infinity;
+                selectedColor = chrome.tabGroups.Color.ORANGE;
+                for (const [color, count] of colorCounts.entries()) {
+                    if (count < minCount) {
+                        minCount = count;
+                        selectedColor = color;
+                    }
+                }
+            }
+            const finalTitle = showLoading ? `\u231B${title.trim()}` : title.trim();
+            await chrome.tabGroups.update(metadata.chromeGroupId, {
+                title: finalTitle,
+                color: selectedColor,
+            });
+        }
+        catch {
+            // Ignore update errors
+        }
+    }
+    async updateTabGroupPrefix(mainTabId, newPrefix, requiredPrefix) {
+        const metadata = this.groupMetadata.get(mainTabId);
+        if (!metadata)
+            return;
+        let retryCount = 0;
+        const prefixRegex = /^(\u231B|\uD83D\uDD14|\u2705)/;
+        const attemptUpdate = async () => {
+            try {
+                const group = await chrome.tabGroups.get(metadata.chromeGroupId);
+                const currentTitle = group.title || "";
+                if (requiredPrefix && !currentTitle.startsWith(requiredPrefix)) {
+                    return;
+                }
+                if (newPrefix && currentTitle.startsWith(newPrefix)) {
+                    return;
+                }
+                if (!newPrefix && !currentTitle.match(prefixRegex)) {
+                    return;
+                }
+                const titleWithoutPrefix = currentTitle.replace(prefixRegex, "").trim();
+                const finalTitle = newPrefix
+                    ? `${newPrefix}${titleWithoutPrefix}`
+                    : titleWithoutPrefix;
+                await chrome.tabGroups.update(metadata.chromeGroupId, { title: finalTitle });
+            }
+            catch {
+                retryCount++;
+                if (retryCount <= 3) {
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                    return attemptUpdate();
+                }
+            }
+        };
+        await attemptUpdate();
+    }
+    async addCompletionPrefix(mainTabId) {
+        await this.updateTabGroupPrefix(mainTabId, "\u2705");
+    }
+    async addLoadingPrefix(mainTabId) {
+        await this.updateTabGroupPrefix(mainTabId, "\u231B");
+    }
+    async addPermissionPrefix(mainTabId) {
+        await this.updateTabGroupPrefix(mainTabId, "\uD83D\uDD14");
+    }
+    async removeCompletionPrefix(mainTabId) {
+        await this.updateTabGroupPrefix(mainTabId, null, "\u2705");
+    }
+    async removePrefix(mainTabId) {
+        await this.updateTabGroupPrefix(mainTabId, null);
+    }
+    async addTabToIndicatorGroup(options) {
+        const { tabId, isRunning, isMcp } = options;
+        let state;
+        if (this.isMainTab(tabId) && isRunning) {
+            state = "pulsing";
+        }
+        else {
+            state = "static";
+        }
+        await this.setTabIndicatorState(tabId, state, isMcp);
+    }
+    async getTabForMcp(tabId, tabGroupId) {
+        await this.initialize();
+        await this.loadMcpTabGroupId();
+        if (tabId !== undefined) {
+            try {
+                const tab = await chrome.tabs.get(tabId);
+                if (tab) {
+                    const group = await this.findGroupByTab(tabId);
+                    let domain;
+                    if (group) {
+                        this.mcpTabGroupId = group.chromeGroupId;
+                        await this.saveMcpTabGroupId();
+                        await this.ensureMcpGroupCharacteristics(group.chromeGroupId);
+                    }
+                    if (tab.url && !tab.url.startsWith("chrome://")) {
+                        try {
+                            domain = new URL(tab.url).hostname || undefined;
+                        }
+                        catch {
+                            // Ignore URL parse errors
+                        }
+                    }
+                    return { tabId, domain };
+                }
+            }
+            catch {
+                throw new Error(`Tab ${tabId} does not exist`);
+            }
+        }
+        if (tabGroupId !== undefined) {
+            // Try to find a managed main tab in the group
+            for (const [mainTabId, metadata] of this.groupMetadata.entries()) {
+                if (metadata.chromeGroupId === tabGroupId) {
+                    try {
+                        if (await chrome.tabs.get(mainTabId)) {
+                            return { tabId: mainTabId, domain: metadata.domain };
+                        }
+                    }
+                    catch {
+                        break;
+                    }
+                }
+            }
+            // Fall back to first tab in the group
+            try {
+                const tabs = await chrome.tabs.query({ groupId: tabGroupId });
+                if (tabs.length > 0 && tabs[0].id) {
+                    let domain;
+                    const url = tabs[0].url;
+                    if (url && !url.startsWith("chrome://")) {
+                        try {
+                            domain = new URL(url).hostname || undefined;
+                        }
+                        catch {
+                            // Ignore URL parse errors
+                        }
+                    }
+                    return { tabId: tabs[0].id, domain };
+                }
+            }
+            catch {
+                // Ignore query errors
+            }
+            throw new Error(`Could not find tab group ${tabGroupId}`);
+        }
+        return { tabId: undefined };
+    }
+    async isTabMcp(tabId) {
+        const mcpConnected = (await chrome.storage.local.get(StorageKeys.MCP_CONNECTED))[StorageKeys.MCP_CONNECTED];
+        if (mcpConnected !== true) {
+            return false;
+        }
+        await this.loadMcpTabGroupId();
+        if (this.mcpTabGroupId === null) {
+            return false;
+        }
+        for (const [, metadata] of this.groupMetadata.entries()) {
+            if (metadata.chromeGroupId === this.mcpTabGroupId &&
+                metadata.memberStates.has(tabId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    async ensureMcpGroupCharacteristics(groupId) {
+        try {
+            const group = await chrome.tabGroups.get(groupId);
+            if (group.title !== z ||
+                group.color !== chrome.tabGroups.Color.YELLOW) {
+                await chrome.tabGroups.update(groupId, {
+                    title: z,
+                    color: chrome.tabGroups.Color.YELLOW,
+                });
+            }
+        }
+        catch {
+            // Ignore update errors
+        }
+    }
+    async clearMcpTabGroup() {
+        this.mcpTabGroupId = null;
+        await chrome.storage.local.remove(this.MCP_TAB_GROUP_KEY);
+    }
+    async getOrCreateMcpTabContext(options) {
+        const { createIfEmpty = false } = options || {};
+        await this.loadMcpTabGroupId();
+        if (this.mcpTabGroupId !== null) {
+            try {
+                await chrome.tabGroups.get(this.mcpTabGroupId);
+                await this.ensureMcpGroupCharacteristics(this.mcpTabGroupId);
+                const tabs = await chrome.tabs.query({ groupId: this.mcpTabGroupId });
+                const availableTabs = tabs
+                    .filter((t) => t.id !== undefined)
+                    .map((t) => ({ id: t.id, title: t.title || "", url: t.url || "" }));
+                if (availableTabs.length > 0) {
+                    return {
+                        currentTabId: availableTabs[0].id,
+                        availableTabs,
+                        tabCount: availableTabs.length,
+                        tabGroupId: this.mcpTabGroupId,
+                    };
+                }
+            }
+            catch {
+                this.mcpTabGroupId = null;
+                await this.saveMcpTabGroupId();
+            }
+        }
+        if (createIfEmpty) {
+            const window = await chrome.windows.create({
+                url: "chrome://newtab",
+                focused: true,
+                type: "normal",
+            });
+            const newTabId = window?.tabs?.[0]?.id;
+            if (!newTabId) {
+                throw new Error("Failed to create window with new tab");
+            }
+            const group = await this.createGroup(newTabId);
+            await chrome.tabGroups.update(group.chromeGroupId, {
+                title: z,
+                color: chrome.tabGroups.Color.YELLOW,
+            });
+            this.mcpTabGroupId = group.chromeGroupId;
+            await this.saveMcpTabGroupId();
+            return {
+                currentTabId: newTabId,
+                availableTabs: [{ id: newTabId, title: "New Tab", url: "chrome://newtab" }],
+                tabCount: 1,
+                tabGroupId: group.chromeGroupId,
+            };
+        }
+        return undefined;
+    }
+    async saveMcpTabGroupId() {
+        await chrome.storage.local.set({
+            [this.MCP_TAB_GROUP_KEY]: this.mcpTabGroupId,
+        });
+    }
+    async loadMcpTabGroupId() {
+        try {
+            const stored = (await chrome.storage.local.get(this.MCP_TAB_GROUP_KEY))[this.MCP_TAB_GROUP_KEY];
+            if (typeof stored === "number") {
+                try {
+                    await chrome.tabGroups.get(stored);
+                    this.mcpTabGroupId = stored;
+                    return;
+                }
+                catch {
+                    // Group no longer exists
+                }
+            }
+            // Try to find by characteristics
+            const foundGroupId = await this.findMcpTabGroupByCharacteristics();
+            if (foundGroupId !== null) {
+                this.mcpTabGroupId = foundGroupId;
+                await this.saveMcpTabGroupId();
+                return;
+            }
+            this.mcpTabGroupId = null;
+        }
+        catch {
+            this.mcpTabGroupId = null;
+        }
+    }
+    async findMcpTabGroupByCharacteristics() {
+        try {
+            const groups = await chrome.tabGroups.query({});
+            for (const group of groups) {
+                if (group.color === chrome.tabGroups.Color.YELLOW &&
+                    group.title?.includes(z)) {
+                    const tabs = await chrome.tabs.query({ groupId: group.id });
+                    if (tabs.length > 0) {
+                        return group.id;
+                    }
+                }
+            }
+            return null;
+        }
+        catch {
+            return null;
+        }
+    }
+    queueIndicatorUpdate(tabId, state) {
+        for (const [, metadata] of this.groupMetadata.entries()) {
+            const memberState = metadata.memberStates.get(tabId);
+            if (memberState) {
+                memberState.pendingUpdate = state;
+                break;
+            }
+        }
+        if (this.indicatorUpdateTimer) {
+            clearTimeout(this.indicatorUpdateTimer);
+        }
+        this.indicatorUpdateTimer = setTimeout(() => {
+            this.processIndicatorQueue();
+        }, this.INDICATOR_UPDATE_DELAY);
+    }
+    async processIndicatorQueue() {
+        for (const [, metadata] of this.groupMetadata.entries()) {
+            for (const [tabId, memberState] of metadata.memberStates) {
+                if (memberState.pendingUpdate) {
+                    let messageType;
+                    switch (memberState.pendingUpdate) {
+                        case "pulsing":
+                            messageType = "SHOW_AGENT_INDICATORS";
+                            break;
+                        case "static":
+                            messageType = "SHOW_STATIC_INDICATOR";
+                            break;
+                        case "none":
+                            messageType = "HIDE_AGENT_INDICATORS";
+                            break;
+                        default:
+                            continue;
+                    }
+                    await this.sendIndicatorMessage(tabId, messageType, memberState.isMcp);
+                    delete memberState.pendingUpdate;
+                }
+            }
+        }
+    }
+    async sendIndicatorMessage(tabId, type, isMcp) {
+        try {
+            await chrome.tabs.sendMessage(tabId, { type, isMcp });
+        }
+        catch (error) {
+            throw error;
+        }
+    }
 }
-
 // K = TabGroupManager singleton instance
 const K = H.getInstance();
-
 export { K, H, j, z, D, M };

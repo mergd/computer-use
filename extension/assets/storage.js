@@ -24,6 +24,9 @@ export const StorageKeys = {
     REFRESH_TOKEN: "refresh_token",
     ANONYMOUS_ID: "anonymous_id",
 };
+// =============================================================================
+// Storage Functions
+// =============================================================================
 /**
  * Get a value from chrome.storage.local
  */
@@ -97,7 +100,9 @@ export async function openSidePanelFromTab(_tabId) {
 }
 /** SavedPromptsService - stub class */
 export class SavedPromptsService {
-    static async getAllPrompts() { return []; }
+    static async getAllPrompts() {
+        return [];
+    }
     static async updateAlarmForPrompt(_prompt) { }
     static async updateNextRunTimes() { }
 }
@@ -121,9 +126,13 @@ export function formatUserIdentity(_user) {
 }
 // Additional stubs for mcp-tools imports
 export const getStoragePromise = getStorageValue;
-export function captureViewportDimensions() { return { width: 1920, height: 1080 }; }
+export function captureViewportDimensions() {
+    return { width: 1920, height: 1080 };
+}
 export const SegmentConfig = {};
-export async function getApiToken() { return undefined; }
+export async function getApiToken() {
+    return undefined;
+}
 export const AuthHelpers = {};
 export const SavedPromptsServiceInstance = new SavedPromptsService();
 export const OAuthConfig = {};
