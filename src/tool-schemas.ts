@@ -176,14 +176,14 @@ export function registerBrowserTools(
     return formatResult(result);
   });
 
-  // Find tool: get tree from extension, then use local Anthropic API
+  // Find tool: get tree from extension, then use Anthropic API or Claude Code OAuth
   server.tool("find", "Find elements by natural language query", findSchema, async (args) => {
     const { tabId, query } = args as { tabId: number; query: string };
 
-    // Check if find tool is available
-    if (!isFindToolAvailable(options.anthropicApiKey)) {
+    // Check if find tool is available (API key or Claude Code CLI)
+    if (!(await isFindToolAvailable(options.anthropicApiKey))) {
       return formatResult({
-        error: "Find tool requires ANTHROPIC_API_KEY. Use read_page instead and analyze the tree yourself.",
+        error: "Find tool requires ANTHROPIC_API_KEY or Claude Code OAuth credentials (~/.claude/.credentials.json)",
       });
     }
 
@@ -209,8 +209,10 @@ export function registerBrowserTools(
       tree = JSON.stringify(treeResult);
     }
 
-    // Execute find with local Anthropic client
-    const result = await executeFindTool(query, tree, { apiKey: options.anthropicApiKey });
+    // Execute find with Anthropic client or Claude Code OAuth fallback
+    const result = await executeFindTool(query, tree, {
+      apiKey: options.anthropicApiKey,
+    });
     return formatResult(result);
   });
 
@@ -240,12 +242,12 @@ export function registerBrowserTools(
   });
 
   server.tool("tabs_context", "Get tab group context info", tabsContextSchema, async (args) => {
-    const result = await execTool("tabs_context", args);
+    const result = await execTool("tabs_context_mcp", args);
     return formatResult(result);
   });
 
   server.tool("tabs_create", "Create new tab in MCP group", tabsCreateSchema, async () => {
-    const result = await execTool("tabs_create", {});
+    const result = await execTool("tabs_create_mcp", {});
     return formatResult(result);
   });
 

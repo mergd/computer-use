@@ -1,9 +1,10 @@
 /**
  * Find tool implementation.
- * Uses Anthropic API to interpret natural language queries against accessibility trees.
+ * Uses Anthropic API key or Claude Code OAuth to interpret natural language queries against accessibility trees.
  */
 
 import { getAnthropicClient, hasAnthropicClient } from "./anthropic-client.js";
+import { createMessageWithOAuth, isClaudeCodeOAuthAvailable, isClaudeCodeOAuthAvailableSync } from "./claude-code-oauth.js";
 
 const FIND_PROMPT = `You are helping find elements on a page/screen. The user wants to find: "{query}"
 
@@ -123,31 +124,49 @@ export async function executeFindTool(
   tree: string,
   options: FindToolOptions = {}
 ): Promise<{ output?: string; error?: string }> {
-  const client = getAnthropicClient(options.apiKey);
-
-  if (!client) {
-    return {
-      error: "Find tool requires an Anthropic API key. Set ANTHROPIC_API_KEY environment variable or provide it in options.",
-    };
-  }
+  const prompt = FIND_PROMPT
+    .replace("{query}", query)
+    .replace("{tree}", tree);
 
   try {
-    const prompt = FIND_PROMPT
-      .replace("{query}", query)
-      .replace("{tree}", tree);
+    let responseText: string;
 
-    const response = await client.createMessage({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 800,
-      messages: [{ role: "user", content: prompt }],
-    });
+    // Try direct API first if key available
+    const client = getAnthropicClient(options.apiKey);
+    if (client) {
+      const response = await client.createMessage({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 800,
+        messages: [{ role: "user", content: prompt }],
+      });
 
-    const textContent = response.content.find(c => c.type === "text");
-    if (!textContent) {
-      return { error: "No text response from API" };
+      const textContent = response.content.find(c => c.type === "text");
+      if (!textContent) {
+        return { error: "No text response from API" };
+      }
+      responseText = textContent.text;
+    }
+    // Fall back to Claude Code CLI
+    else if (await isClaudeCodeOAuthAvailable()) {
+      const response = await createMessageWithOAuth({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 800,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const textContent = response.content.find(c => c.type === "text");
+      if (!textContent) {
+        return { error: "No text response from Claude Code OAuth" };
+      }
+      responseText = textContent.text;
+    }
+    else {
+      return {
+        error: "Find tool requires ANTHROPIC_API_KEY or Claude Code OAuth credentials (~/.claude/.credentials.json)",
+      };
     }
 
-    const result = parseFindings(textContent.text);
+    const result = parseFindings(responseText);
     return { output: formatFindResult(result) };
   } catch (err) {
     return {
@@ -157,8 +176,8 @@ export async function executeFindTool(
 }
 
 /**
- * Check if find tool is available (has API key configured)
+ * Check if find tool is available (has API key or Claude Code CLI)
  */
-export function isFindToolAvailable(apiKey?: string): boolean {
-  return hasAnthropicClient(apiKey);
+export async function isFindToolAvailable(apiKey?: string): Promise<boolean> {
+  return hasAnthropicClient(apiKey) || await isClaudeCodeOAuthAvailable();
 }

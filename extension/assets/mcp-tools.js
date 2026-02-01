@@ -45,7 +45,7 @@ import {
   d as w,
   K as y,
   g as v,
-} from "./react-core.js";
+} from "./storage.js";
 import { re, Q, setTabGroupManager } from "./cdp-debugger.js";
 import { K, H, j, z, D, M, setDomainCategoryCache } from "./tab-group-manager.js";
 

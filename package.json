@@ -15,9 +15,15 @@
     "format": "oxfmt ."
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
+    "@types/chrome": "^0.1.36",
     "@types/node": "^22.0.0",
-    "@types/ws": "^8.5.0"
+    "@types/ws": "^8.5.0",
+    "js-beautify": "^1.15.4",
+    "lebab": "^3.2.7",
+    "synchrony": "^0.10.2",
+    "ts-morph": "^27.0.2",
+    "typescript": "^5.9.3",
+    "wakaru": "^0.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",

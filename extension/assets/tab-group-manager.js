@@ -15,7 +15,7 @@
  *   j ("Computer Control" constant)
  *   z ("MCP" constant)
  */
-import { S as o } from "./react-core.js";
+import { S as o } from "./storage.js";
 
 // DomainCategoryCache is imported from mcp-tools.js
 let W = null;
