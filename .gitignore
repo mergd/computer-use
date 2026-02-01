@@ -2,5 +2,5 @@ node_modules/
 dist/
 *.tgz
 
-# Compiled extension assets (source is in extension/src/)
-extension/assets/*.js
+# Compiled extension output (source is in extension/src/)
+extension/dist/

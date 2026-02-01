@@ -9,12 +9,12 @@
    "commands": {},
    "content_scripts": [ {
       "all_frames": true,
-      "js": [ "assets/accessibility-tree.js" ],
+      "js": [ "dist/accessibility-tree.js" ],
       "matches": [ "\u003Call_urls>" ],
       "run_at": "document_start"
    }, {
       "all_frames": false,
-      "js": [ "assets/agent-visual-indicator.js" ],
+      "js": [ "dist/agent-visual-indicator.js" ],
       "matches": [ "\u003Call_urls>" ],
       "run_at": "document_idle"
    } ],
@@ -33,7 +33,7 @@
    "version": "0.1.0",
    "web_accessible_resources": [ {
       "matches": [ "\u003Call_urls>" ],
-      "resources": [ "assets/accessibility-tree.js", "assets/agent-visual-indicator.js" ],
+      "resources": [ "dist/accessibility-tree.js", "dist/agent-visual-indicator.js" ],
       "use_dynamic_url": false
    } ]
 }

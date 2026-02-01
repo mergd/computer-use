@@ -9,7 +9,7 @@
     "strictNullChecks": false,
     "skipLibCheck": true,
     "noEmit": false,
-    "outDir": "./assets",
+    "outDir": "./dist",
     "rootDir": "./src",
     "declaration": false,
     "sourceMap": false,
