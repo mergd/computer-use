@@ -4,3 +4,7 @@ dist/
 
 # Compiled extension output (source is in extension/src/)
 extension/dist/
+
+# Chrome Web Store submission artifacts
+extension/*.zip
+extension/screenshots/
