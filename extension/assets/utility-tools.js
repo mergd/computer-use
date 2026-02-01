@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * utility-tools.ts - Miscellaneous utility tools
  *

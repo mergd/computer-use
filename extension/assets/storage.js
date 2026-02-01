@@ -105,6 +105,13 @@ export class SavedPromptsService {
     }
     static async updateAlarmForPrompt(_prompt) { }
     static async updateNextRunTimes() { }
+    static async getPromptById(_id) {
+        return null;
+    }
+    static async getPromptByCommand(_command) {
+        return null;
+    }
+    static async recordPromptUsage(_id) { }
 }
 /** Tool permission types (enum stub) - imported by mcp-tools.js */
 export const ToolPermissionType = {

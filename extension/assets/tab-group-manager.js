@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * tab-group-manager.ts - Chrome Tab Group Management
  *
@@ -246,7 +245,8 @@ class H {
         return H.instance;
     }
     async dismissStaticIndicatorsForGroup(chromeGroupId) {
-        const dismissedGroups = (await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY))[this.DISMISSED_GROUPS_KEY] || [];
+        const storage = await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY);
+        const dismissedGroups = storage[this.DISMISSED_GROUPS_KEY] || [];
         if (!dismissedGroups.includes(chromeGroupId)) {
             dismissedGroups.push(chromeGroupId);
         }

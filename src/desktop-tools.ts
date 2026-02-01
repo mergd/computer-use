@@ -379,6 +379,11 @@ function mouseClick(args: { x: number; y: number; button?: string; clicks?: numb
   const button = args.button || "left";
   const clicks = args.clicks || 1;
 
+  // LLM tends to overshoot slightly high when identifying click targets
+  // Add small downward adjustment to compensate
+  const Y_ADJUSTMENT = 3;
+  const adjustedY = args.y + Y_ADJUSTMENT;
+
   const buttonMap: Record<string, string> = {
     left: "c",
     right: "rc",
@@ -389,14 +394,14 @@ function mouseClick(args: { x: number; y: number; button?: string; clicks?: numb
 
   // For double-click, use dc command
   if (clicks === 2 && button === "left") {
-    runCliclick(`dc:${args.x},${args.y}`);
+    runCliclick(`dc:${args.x},${adjustedY}`);
   } else {
     for (let i = 0; i < clicks; i++) {
-      runCliclick(`${cmd}:${args.x},${args.y}`);
+      runCliclick(`${cmd}:${args.x},${adjustedY}`);
     }
   }
 
-  return { success: true, x: args.x, y: args.y, button, clicks };
+  return { success: true, x: args.x, y: adjustedY, button, clicks };
 }
 
 function mouseMove(args: { x: number; y: number }) {
@@ -574,9 +579,19 @@ async function listWindows(args: { app?: string }) {
 }
 
 async function focusApp(args: { app: string }) {
-  const script = `tell application "${args.app}" to activate`;
-  await runOsascript(script);
-  return { success: true, app: args.app };
+  // Use `open -a` which is more reliable than AppleScript activate
+  // It launches the app if not running, or brings it to front if running
+  try {
+    await execAsync(`open -a "${args.app}"`, { timeout: 5000 });
+    // Small delay to let the app come to front
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return { success: true, app: args.app };
+  } catch (err) {
+    // Fallback to AppleScript if open fails (e.g., app name doesn't match bundle name)
+    const script = `tell application "${args.app}" to activate`;
+    await runOsascript(script);
+    return { success: true, app: args.app, fallback: "applescript" };
+  }
 }
 
 async function getAccessibilityTree(args: { app?: string; maxDepth?: number }) {
@@ -588,8 +603,10 @@ async function getAccessibilityTree(args: { app?: string; maxDepth?: number }) {
   const swiftScript = `
 import Cocoa
 import ApplicationServices
+import Foundation
 
 var refCounter = 0
+let startTime = CFAbsoluteTimeGetCurrent()
 
 struct Element {
     let role: String
@@ -713,12 +730,17 @@ if appName.isEmpty {
 }
 
 guard let element = appElement else {
-    print("ERROR: Could not find app")
+    fputs("ERROR: Could not find app\\n", stderr)
     exit(1)
 }
 
 var elements: [Element] = []
 traverseElement(element, depth: 0, maxDepth: maxDepth, elements: &elements)
+
+let traverseTime = CFAbsoluteTimeGetCurrent() - startTime
+
+// Output timing info to stderr
+fputs("DEBUG: app=\\(resolvedAppName) maxDepth=\\(maxDepth) elements=\\(elements.count) traverseMs=\\(Int(traverseTime * 1000))\\n", stderr)
 
 // Output in the expected format: role "name" [ref_N] @x,y wxh
 if !appName.isEmpty {
@@ -741,20 +763,38 @@ for elem in elements {
 `;
 
   const swiftFile = path.join(os.tmpdir(), `ax-tree-${Date.now()}.swift`);
+  const startTotal = Date.now();
+
   fs.writeFileSync(swiftFile, swiftScript);
 
+  // Use shorter timeout - depth 3-4 should complete in <2s, depth 5-6 in <5s
+  const timeoutMs = 15000;
+
   try {
-    const { stdout } = await execAsync(`swift "${swiftFile}"`, { timeout: 30000 });
+    const { stdout, stderr } = await execAsync(`swift "${swiftFile}"`, { timeout: timeoutMs });
     fs.unlinkSync(swiftFile);
-    return { tree: stdout };
+
+    const totalMs = Date.now() - startTotal;
+
+    // Log timing info
+    console.error(`[get_accessibility_tree] total=${totalMs}ms ${stderr?.trim() || ""}`);
+
+    return { tree: stdout, timing: { totalMs } };
   } catch (err: unknown) {
     try {
       fs.unlinkSync(swiftFile);
     } catch {
       // Ignore cleanup errors
     }
+    const totalMs = Date.now() - startTotal;
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Accessibility tree failed: ${message}`);
+
+    // Check if it was a timeout
+    if (message.includes("TIMEOUT") || message.includes("timed out") || totalMs >= timeoutMs - 100) {
+      throw new Error(`Accessibility tree timed out after ${totalMs}ms (limit: ${timeoutMs}ms). Try reducing maxDepth (current: ${maxDepth}).`);
+    }
+
+    throw new Error(`Accessibility tree failed after ${totalMs}ms: ${message}`);
   }
 }
 
@@ -896,7 +936,7 @@ if result == .success {
 }
 `;
 
-  const output = await runSwiftAX(swiftCode);
+  const { output } = await runSwiftAX(swiftCode, 10000, "click_element");
   return { success: output.includes("SUCCESS"), output: output.trim() };
 }
 
@@ -932,7 +972,7 @@ if result == .success {
 }
 `;
 
-  const output = await runSwiftAX(swiftCode);
+  const { output } = await runSwiftAX(swiftCode, 10000, "set_value");
   return { success: output.includes("SUCCESS"), output: output.trim() };
 }
 
@@ -1018,7 +1058,7 @@ for (key, value) in info.sorted(by: { $0.key < $1.key }) {
 }
 `;
 
-  const output = await runSwiftAX(swiftCode);
+  const { output } = await runSwiftAX(swiftCode, 10000, "get_element_info");
 
   // Parse output into object
   const info: Record<string, string> = {};
@@ -1118,7 +1158,7 @@ for (index, menuName) in menuPath.enumerated() {
 }
 `;
 
-  const output = await runSwiftAX(swiftCode);
+  const { output } = await runSwiftAX(swiftCode, 10000, "select_menu");
   return { success: output.includes("SUCCESS"), output: output.trim() };
 }
 
@@ -1257,7 +1297,7 @@ eventUp.post(tap: .cghidEventTap)
 print("SUCCESS: Key ${args.key} ${keyDown && !keyUp ? "down" : keyUp && !keyDown ? "up" : "pressed"}${modifiers.length > 0 ? ` with ${modifiers.join("+")}` : ""}${appTarget ? ` to ${appTarget}` : ""}")
 `;
 
-  const output = await runSwiftAX(swiftCode);
+  const { output } = await runSwiftAX(swiftCode, 5000, "press_key_cg");
   return { success: output.includes("SUCCESS"), output: output.trim() };
 }
 
@@ -1270,7 +1310,7 @@ import Foundation
 ${args.code}
 `;
 
-  const output = await runSwiftAX(swiftCode);
+  const { output } = await runSwiftAX(swiftCode, 30000, "run_swift");
   return { output: output.trim() };
 }
 

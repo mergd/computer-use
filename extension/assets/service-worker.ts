@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * service-worker.ts - Main service worker entry point for Chrome extension
  *
@@ -19,6 +18,7 @@ import {
   _ as dynamicImport,
   I as handleOAuthRedirect,
   b as SavedPromptsService,
+  SavedPrompt,
 } from "./storage.js";
 
 import {
@@ -91,16 +91,7 @@ interface ScheduledTask {
   model?: string;
 }
 
-/** Saved prompt configuration */
-interface SavedPrompt {
-  id: string;
-  command?: string;
-  prompt: string;
-  url?: string;
-  repeatType?: string;
-  skipPermissions?: boolean;
-  model?: string;
-}
+// SavedPrompt imported from storage.ts
 
 /** Main tab aliveness cache entry */
 interface MainTabAlivenessCacheEntry {
@@ -498,7 +489,7 @@ async function handleToolRequest(request: NativeMessage): Promise<void> {
         clientId: clientId,
       };
       sendToolResponse(
-        await executeToolRequest(toolRequest),
+        await executeToolRequest(toolRequest) as ToolResponse,
         clientId
       );
     } else {
@@ -1501,7 +1492,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     try {
       const alarmName = alarm.name;
       const storage = await chrome.storage.local.get(["savedPrompts"]);
-      const prompts: SavedPrompt[] = storage.savedPrompts || [];
+      const prompts: SavedPrompt[] = (storage.savedPrompts as SavedPrompt[]) || [];
       const prompt = prompts.find((p) => p.id === alarmName);
 
       if (prompt) {
@@ -1538,11 +1529,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         // Schedule next occurrence for monthly/annually repeating tasks
         if (prompt.repeatType === "monthly" || prompt.repeatType === "annually") {
           try {
-            const { SavedPromptsService } = await dynamicImport(async () => {
-              const module = await import("./react-core.js");
-              return { SavedPromptsService: (module as { N: { SavedPromptsService: typeof SavedPromptsService } }).N.SavedPromptsService };
-            }, []);
-            await SavedPromptsService.updateAlarmForPrompt(prompt);
+            const module = await import("./react-core.js");
+            await module.SavedPromptsService.updateAlarmForPrompt(prompt);
           } catch {
             // Create retry alarm
             const retryAlarmName = `retry_${alarmName}`;
@@ -1577,16 +1565,13 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     try {
       const originalAlarmName = alarm.name.replace("retry_", "");
       const storage = await chrome.storage.local.get(["savedPrompts"]);
-      const prompts: SavedPrompt[] = storage.savedPrompts || [];
+      const prompts: SavedPrompt[] = (storage.savedPrompts as SavedPrompt[]) || [];
       const prompt = prompts.find((p) => p.id === originalAlarmName);
 
       if (prompt && (prompt.repeatType === "monthly" || prompt.repeatType === "annually")) {
         try {
-          const { SavedPromptsService } = await dynamicImport(async () => {
-            const module = await import("./react-core.js");
-            return { SavedPromptsService: (module as { N: { SavedPromptsService: typeof SavedPromptsService } }).N.SavedPromptsService };
-          }, []);
-          await SavedPromptsService.updateAlarmForPrompt(prompt);
+          const module = await import("./react-core.js");
+          await module.SavedPromptsService.updateAlarmForPrompt(prompt);
         } catch {
           try {
             await chrome.notifications.create({

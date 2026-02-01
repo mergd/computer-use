@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * tab-group-manager.ts - Chrome Tab Group Management
  *
@@ -296,7 +295,7 @@ class M {
         hasChanges = true;
       }
       if ("groupId" in changeInfo) {
-        changes.groupId = changeInfo.groupId;
+        changes.groupId = changeInfo.groupId as number;
         hasChanges = true;
       }
       if (changeInfo.title !== undefined) {
@@ -466,10 +465,8 @@ class H {
   }
 
   async dismissStaticIndicatorsForGroup(chromeGroupId: number): Promise<void> {
-    const dismissedGroups: number[] =
-      (
-        await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY)
-      )[this.DISMISSED_GROUPS_KEY] || [];
+    const storage = await chrome.storage.local.get(this.DISMISSED_GROUPS_KEY);
+    const dismissedGroups: number[] = (storage[this.DISMISSED_GROUPS_KEY] as number[]) || [];
     if (!dismissedGroups.includes(chromeGroupId)) {
       dismissedGroups.push(chromeGroupId);
     }
@@ -715,7 +712,7 @@ class H {
         .filter((t) => t.id && t.id !== excludeTabId)
         .map((t) => t.id) as number[];
       if (tabIds.length > 0) {
-        await chrome.tabs.ungroup(tabIds);
+        await chrome.tabs.ungroup(tabIds as [number, ...number[]]);
       }
     } catch {
       // Ignore cleanup errors
@@ -1346,7 +1343,7 @@ class H {
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         if (tabIds.length > 0) {
-          await chrome.tabs.ungroup(tabIds);
+          await chrome.tabs.ungroup(tabIds as [number, ...number[]]);
         }
       }
     } catch {

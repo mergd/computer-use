@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * page-tools.ts - Page interaction tools
  *
@@ -696,7 +695,7 @@ export const javascriptTool = {
                 const isTimeout = exception?.description?.includes("execution was terminated");
                 errorMessage = isTimeout
                     ? "Execution timeout: Code exceeded 10-second limit"
-                    : exception?.description || exception?.value || "Unknown error";
+                    : exception?.description || String(exception?.value) || "Unknown error";
             }
             else if (evalResult.result) {
                 const result = evalResult.result;

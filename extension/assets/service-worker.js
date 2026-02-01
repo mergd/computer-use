@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * service-worker.ts - Main service worker entry point for Chrome extension
  *
@@ -10,7 +9,7 @@
  * - Scheduled prompt/task execution
  * - OAuth and external message handling
  */
-import { s as setStorageValue, S as StorageKeys, h as getApiConfig, H as handleLogout, _ as dynamicImport, I as handleOAuthRedirect, b as SavedPromptsService, } from "./storage.js";
+import { s as setStorageValue, S as StorageKeys, h as getApiConfig, H as handleLogout, I as handleOAuthRedirect, b as SavedPromptsService, } from "./storage.js";
 import { L as notifyDisconnection, t as TabGroupManager, M as createErrorResponse, N as executeToolRequest, } from "./mcp-tools.js";
 /** Native messaging connection state */
 let nativePort = null;
@@ -1233,11 +1232,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
                 // Schedule next occurrence for monthly/annually repeating tasks
                 if (prompt.repeatType === "monthly" || prompt.repeatType === "annually") {
                     try {
-                        const { SavedPromptsService } = await dynamicImport(async () => {
-                            const module = await import("./react-core.js");
-                            return { SavedPromptsService: module.N.SavedPromptsService };
-                        }, []);
-                        await SavedPromptsService.updateAlarmForPrompt(prompt);
+                        const module = await import("./react-core.js");
+                        await module.SavedPromptsService.updateAlarmForPrompt(prompt);
                     }
                     catch {
                         // Create retry alarm
@@ -1278,11 +1274,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
             const prompt = prompts.find((p) => p.id === originalAlarmName);
             if (prompt && (prompt.repeatType === "monthly" || prompt.repeatType === "annually")) {
                 try {
-                    const { SavedPromptsService } = await dynamicImport(async () => {
-                        const module = await import("./react-core.js");
-                        return { SavedPromptsService: module.N.SavedPromptsService };
-                    }, []);
-                    await SavedPromptsService.updateAlarmForPrompt(prompt);
+                    const module = await import("./react-core.js");
+                    await module.SavedPromptsService.updateAlarmForPrompt(prompt);
                 }
                 catch {
                     try {

@@ -139,6 +139,12 @@ export async function openSidePanelFromTab(_tabId: number): Promise<void> {
 /** Saved prompt type */
 export interface SavedPrompt {
   id: string;
+  command?: string;
+  prompt?: string;
+  url?: string;
+  repeatType?: string;
+  skipPermissions?: boolean;
+  model?: string;
   [key: string]: unknown;
 }
 
@@ -149,6 +155,13 @@ export class SavedPromptsService {
   }
   static async updateAlarmForPrompt(_prompt: SavedPrompt): Promise<void> {}
   static async updateNextRunTimes(): Promise<void> {}
+  static async getPromptById(_id: string): Promise<SavedPrompt | null> {
+    return null;
+  }
+  static async getPromptByCommand(_command: string): Promise<SavedPrompt | null> {
+    return null;
+  }
+  static async recordPromptUsage(_id: string): Promise<void> {}
 }
 
 /** Tool permission types (enum stub) - imported by mcp-tools.js */

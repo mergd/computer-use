@@ -7,7 +7,8 @@
 export interface SavedPrompt {
   id: string;
   command?: string;
-  repeatType?: "monthly" | "annually";
+  repeatType?: string;
+  [key: string]: unknown;
 }
 
 export const SavedPromptsService = {
