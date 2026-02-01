@@ -1,7 +1,7 @@
 // Clear uninstall URL - we don't want to open external forms
 chrome.runtime.setUninstallURL('');
 
-import './assets/service-worker.js';
+import './service-worker.js';
 
 // Override after import and on install to ensure it stays cleared
 chrome.runtime.setUninstallURL('');
