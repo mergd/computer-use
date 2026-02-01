@@ -324,13 +324,45 @@ export function registerBrowserTools(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatResult(result: unknown): { content: Array<{ type: "text"; text: string }> } {
-  // Handle results that are already in MCP content format
+interface AnthropicImageContent {
+  type: "image";
+  source: { type: "base64"; media_type: string; data: string };
+}
+
+interface McpImageContent {
+  type: "image";
+  data: string;
+  mimeType: string;
+}
+
+interface McpTextContent {
+  type: "text";
+  text: string;
+}
+
+type McpContent = McpTextContent | McpImageContent;
+
+function formatResult(result: unknown): { content: McpContent[] } {
+  // Handle results that are already in content format
   if (result && typeof result === "object" && "content" in result) {
     const r = result as { content: unknown };
     if (Array.isArray(r.content)) {
-      // Already formatted content array
-      return { content: r.content as Array<{ type: "text"; text: string }> };
+      // Convert Anthropic image format to MCP format
+      const convertedContent = r.content.map((item: unknown) => {
+        if (item && typeof item === "object" && "type" in item) {
+          const typed = item as { type: string; source?: { type: string; media_type: string; data: string } };
+          if (typed.type === "image" && typed.source?.type === "base64") {
+            // Convert from Anthropic format to MCP format
+            return {
+              type: "image" as const,
+              data: typed.source.data,
+              mimeType: typed.source.media_type,
+            };
+          }
+        }
+        return item;
+      });
+      return { content: convertedContent as McpContent[] };
     }
     if (typeof r.content === "string") {
       return { content: [{ type: "text", text: r.content }] };

@@ -440,11 +440,13 @@ export class ToolCallHandler {
       }
 
       if ("base64Image" in result && result.base64Image) {
-        const mediaType = result.imageFormat ? `image/${result.imageFormat}` : "image/png";
+        const mimeType = result.imageFormat ? `image/${result.imageFormat}` : "image/png";
+        // Use MCP format for images (data and mimeType at top level)
         content.push({
           type: "image",
-          source: { type: "base64", media_type: mediaType, data: result.base64Image },
-        });
+          data: result.base64Image,
+          mimeType,
+        } as unknown as ToolResultContent);
       }
 
       return content.length > 0 ? content : "";

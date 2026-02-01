@@ -570,11 +570,5 @@ function shouldIncludeElement(element: Element, options: TreeOptions): boolean {
   };
 })();
 
-// =============================================================================
-// Exports for backward compatibility
-// =============================================================================
-
-/**
- * Export the generate function for use in other modules
- */
-export const __generateAccessibilityTree = window.__generateAccessibilityTree;
+// Note: This file is injected as a content script, not imported as a module.
+// The function is made available via window.__generateAccessibilityTree by the IIFE above.
