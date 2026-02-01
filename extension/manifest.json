@@ -6,15 +6,7 @@
       "service_worker": "service-worker-loader.js",
       "type": "module"
    },
-   "commands": {
-      "toggle-side-panel": {
-         "description": "Toggle Computer Control side panel",
-         "suggested_key": {
-            "default": "Ctrl+Shift+E",
-            "mac": "Command+Shift+E"
-         }
-      }
-   },
+   "commands": {},
    "content_scripts": [ {
       "all_frames": true,
       "js": [ "assets/accessibility-tree.js" ],
@@ -37,7 +29,7 @@
    "manifest_version": 3,
    "name": "Computer Control",
    "options_page": "options.html",
-   "permissions": [ "sidePanel", "storage", "activeTab", "scripting", "debugger", "tabGroups", "tabs", "alarms", "notifications", "system.display", "webNavigation", "declarativeNetRequestWithHostAccess", "nativeMessaging", "unlimitedStorage", "downloads" ],
+   "permissions": [ "storage", "activeTab", "scripting", "debugger", "tabGroups", "tabs", "alarms", "notifications", "system.display", "webNavigation", "declarativeNetRequestWithHostAccess", "nativeMessaging", "downloads", "cookies", "clipboardRead", "clipboardWrite", "history", "webRequest", "pageCapture" ],
    "version": "0.1.0",
    "web_accessible_resources": [ {
       "matches": [ "\u003Call_urls>" ],

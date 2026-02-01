@@ -2,18 +2,18 @@
  * MCP Server + WebSocket bridge for browser automation.
  *
  * Architecture:
- *   MCP Client ──stdio──> mcp-server ──WebSocket──> native-host-entry ──native msg──> Extension
+ *   MCP Client ──HTTP/SSE──> mcp-server ──WebSocket──> native-host-entry ──native msg──> Extension
  *
- * The native-host-entry connects via WebSocket and transparently relays messages
- * to/from the Chrome extension using native messaging.
+ * The server runs persistently. Claude Code connects via SSE, and the Chrome
+ * extension's native host connects via WebSocket.
  */
 
 import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import { WebSocketServer, WebSocket } from "ws";
+import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { randomUUID } from "node:crypto";
 
 import { registerBrowserTools, type ExecToolFn } from "./tool-schemas.js";
 
@@ -36,7 +36,15 @@ interface IncomingMessage {
 
 export interface McpServerOptions {
   skipPermissions?: boolean;
+  anthropicApiKey?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const HTTP_PORT = 62220;
+const WS_PORT = 62222;
 
 // ---------------------------------------------------------------------------
 // MCP Server
@@ -50,44 +58,20 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   let connected = false;
   const pending = new Map<string, PendingRequest>();
 
-  // IPC port file location
-  const stateDir = path.join(os.homedir(), ".browser-mcp");
-  const portFile = path.join(stateDir, "ipc-port");
-
-  // Cleanup port file on exit
-  const cleanup = () => {
-    try {
-      if (fs.existsSync(portFile)) {
-        fs.unlinkSync(portFile);
-      }
-    } catch {}
-  };
-  process.on("exit", cleanup);
-  process.on("SIGINT", () => { cleanup(); process.exit(0); });
-  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
-
   // ---------------------------------------------------------------------------
-  // WebSocket Server
+  // WebSocket Server (for Chrome extension native host)
   // ---------------------------------------------------------------------------
 
-  const wss = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  const wss = new WebSocketServer({ host: "127.0.0.1", port: WS_PORT });
 
-  await new Promise<void>((resolve) => {
-    wss.on("listening", () => {
-      const addr = wss.address();
-      if (typeof addr === "object" && addr) {
-        const port = addr.port;
-        fs.mkdirSync(stateDir, { recursive: true });
-        fs.writeFileSync(portFile, String(port));
-        log(`WebSocket server listening on 127.0.0.1:${port}`);
-      }
-      resolve();
-    });
+  wss.on("listening", () => {
+    log(`WebSocket server listening on 127.0.0.1:${WS_PORT}`);
   });
 
   wss.on("connection", (ws) => {
     log("Native host connected via WebSocket");
     extensionSocket = ws;
+    connected = true;
 
     ws.on("message", (data) => {
       try {
@@ -102,7 +86,6 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
       log("Native host disconnected");
       extensionSocket = null;
       connected = false;
-      // Reject all pending requests
       for (const [id, req] of pending) {
         clearTimeout(req.timer);
         req.reject(new Error("Extension disconnected"));
@@ -116,7 +99,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   });
 
   // ---------------------------------------------------------------------------
-  // Message Handling
+  // Message Handling (from extension)
   // ---------------------------------------------------------------------------
 
   function send(msg: unknown): void {
@@ -133,18 +116,14 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
 
       case "get_status":
         send({ type: "status_response", nativeHostInstalled: true, mcpConnected: true });
-        if (!connected) {
-          connected = true;
-          if (options.skipPermissions) {
-            send({ type: "set_skip_permissions", value: true });
-          }
-          send({ type: "mcp_connected" });
-          log("Extension connected — MCP server ready");
+        if (options.skipPermissions) {
+          send({ type: "set_skip_permissions", value: true });
         }
+        send({ type: "mcp_connected" });
+        log("Extension handshake complete");
         break;
 
       case "tool_response": {
-        // Resolve the most recent pending request (FIFO)
         const [id, req] = [...pending.entries()].at(-1) ?? [];
         if (id && req) {
           clearTimeout(req.timer);
@@ -172,7 +151,14 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
 
   const execTool: ExecToolFn = async (name, args) => {
     if (!connected) {
-      throw new Error("Extension not connected. Make sure Chrome is running with the extension active.");
+      log("Waiting for extension connection...");
+      const waitStart = Date.now();
+      while (!connected && Date.now() - waitStart < 10_000) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      if (!connected) {
+        throw new Error("Extension not connected. Make sure Chrome is running with the extension active.");
+      }
     }
 
     const id = `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -194,25 +180,43 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   };
 
   // ---------------------------------------------------------------------------
-  // MCP Server Setup
+  // MCP Server with Streamable HTTP Transport
   // ---------------------------------------------------------------------------
 
-  const server = new McpServer({
+  const app = express();
+  app.use(express.json());
+
+  // Single persistent MCP server instance (stateless mode)
+  const mcpServer = new McpServer({
     name: "browser-mcp",
     version: "0.1.0",
   });
+  registerBrowserTools(mcpServer, execTool, {
+    anthropicApiKey: options.anthropicApiKey,
+  });
 
-  registerBrowserTools(server, execTool);
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // Stateless - no sessions
+  });
 
-  // Connect via stdio
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await mcpServer.connect(transport);
+  log("MCP server initialized");
 
-  log("MCP server started on stdio");
+  // Single /mcp endpoint
+  app.all("/mcp", async (req, res) => {
+    await transport.handleRequest(req, res, req.body);
+  });
 
+  // Start HTTP server
+  app.listen(HTTP_PORT, "127.0.0.1", () => {
+    log(`HTTP/SSE server listening on http://127.0.0.1:${HTTP_PORT}`);
+  });
+
+  log("MCP server started");
   if (options.skipPermissions) {
     log("Permission bypass enabled — all domains auto-approved");
   }
-
-  log("Waiting for Chrome extension connection…");
+  log("Waiting for connections...");
+  log(`  - Claude Code: http://127.0.0.1:${HTTP_PORT}/mcp`);
+  log(`  - Extension: WebSocket on port ${WS_PORT}`);
 }

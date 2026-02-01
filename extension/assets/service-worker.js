@@ -1,1 +1,1406 @@
-import{s as e,S as t,h as a,o as s,H as n,_ as r,I as o,b as i}from"./react-core.js";const c=()=>{};import{L as d,t as u,M as m,N as l,O as p,P as h,Q as w}from"./mcp-tools.js";import"./anthropic-client.js";let y=null,f=null,_=!1,g=!1,T=!1,b=null,I=null;function v(e){e?.includes("native messaging host not found")&&(g=!1)}async function E(){try{return await async function(){if(y)return!0;if(_)return!1;_=!0;try{if(!(await chrome.permissions.contains({permissions:["nativeMessaging"]})))return!1;if("function"!=typeof chrome.runtime.connectNative)return!1;const s=[{name:"com.browsermcp.native_host_desktop",label:"Desktop"},{name:"com.browsermcp.native_host",label:"Claude Code"}];for(const n of s)try{const a=chrome.runtime.connectNative(n.name);if(await new Promise(e=>{let t=!1;const s=()=>{t||(t=!0,chrome.runtime.lastError,e(!1))},n=r=>{t||"pong"===r.type&&(t=!0,a.onDisconnect.removeListener(s),a.onMessage.removeListener(n),e(!0))};a.onDisconnect.addListener(s),a.onMessage.addListener(n);try{a.postMessage({type:"ping"})}catch(r){return void(t||(t=!0,e(!1)))}setTimeout(()=>{t||(t=!0,a.onDisconnect.removeListener(s),a.onMessage.removeListener(n),e(!1))},1e4)}))return y=a,f=n.name,g=!0,y.onMessage.addListener(async e=>{await N(e)}),y.onDisconnect.addListener(()=>{const a=chrome.runtime.lastError?.message;y=null,f=null,T=!1,e(t.MCP_CONNECTED,!1),v(a),d()}),y.postMessage({type:"get_status"}),!0;a.disconnect()}catch(a){}return!1}catch(a){return a instanceof Error&&v(a.message),!1}finally{_=!1}}()}catch(a){return!1}}async function A(){try{return await chrome.permissions.remove({permissions:["nativeMessaging"]}),y?.disconnect(),y=null,f=null,_=!1,g=!1,T=!1,!0}catch(e){return!1}}async function N(a){switch(a.type){case"tool_request":await async function(e){try{const{method:t,params:a}=e;if("execute_tool"===t){if(!a?.tool)return void P(m("No tool specified"));const e=a.client_id,t=a.args?.tabGroupId,s="number"==typeof t?t:void 0,n=a.args?.tabId,r="number"==typeof n?n:void 0;P(await l({toolName:a.tool,args:a.args||{},tabId:r,tabGroupId:s,clientId:e}),e)}else P({content:`Unknown method: ${t}`})}catch(t){P(m(`Tool execution failed: ${t instanceof Error?t.message:"Unknown error"}`))}}(a);break;case"status_response":b&&(clearTimeout(I),I=null,b({nativeHostInstalled:g,mcpConnected:T}),b=null);break;case"mcp_connected":!async function(){T=!0,e(t.MCP_CONNECTED,!0),await u.initialize(),u.startTabGroupChangeListener()}();break;case"set_skip_permissions":self.__skipPermissions=!!a.value;break;case"mcp_disconnected":T=!1,e(t.MCP_CONNECTED,!1),u.stopTabGroupChangeListener()}}function P({content:e,is_error:t},a){if(!y)return;if(!e||"string"!=typeof e&&!Array.isArray(e))return;let s;s=t?function(e){let t;const a="IMPORTANT: The user has explicitly declined this action. Do not attempt to use other tools or workarounds. Instead, acknowledge the denial and ask the user how they would prefer to proceed.";t="string"==typeof e?e.includes("Permission denied by user")?`${e} - ${a}`:e:e.map(t=>"object"==typeof t&&null!==t&&"text"in t&&"string"==typeof t.text&&t.text.includes("Permission denied by user")?{...t,text:`${e} - ${a}`}:t);return{type:"tool_response",error:{content:t}}}(e):{type:"tool_response",result:{content:e}},y.postMessage(s)}async function S(){const e=a(),t=`${`claude-browser-extension/${chrome.runtime.getManifest().version} (external)`} ${navigator.userAgent} `,s=[{id:1,priority:1,action:{type:chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,requestHeaders:[{header:"User-Agent",operation:chrome.declarativeNetRequest.HeaderOperation.SET,value:t}]},condition:{urlFilter:`${e.apiBaseUrl}/*`,resourceTypes:[chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,chrome.declarativeNetRequest.ResourceType.OTHER]}}];await chrome.declarativeNetRequest.updateSessionRules({removeRuleIds:[1],addRules:s})}const L="/chrome/";async function k(e,t){try{const a=new URL(e);if("clau.de"!==a.host)return!1;if("/chrome/permissions"===a.pathname.toLowerCase())return await async function(e){try{const e=chrome.runtime.getURL("options.html#permissions");await chrome.tabs.create({url:e})}catch(t){}finally{await M(e)}}(t),!0;if(!a.pathname.startsWith(L))return!1;const s=a.pathname.substring(8).toLowerCase();if("reconnect"===s)return await async function(e){try{await A(),await new Promise(e=>setTimeout(e,500));const e=await E();p("claude_chrome.extension_url.reconnect",{success:e})}catch(t){p("claude_chrome.extension_url.reconnect",{success:!1})}finally{await M(e)}}(t),!0;if(s.startsWith("tab/")){const e=parseInt(s.substring(4),10);return await async function(e,t){if(isNaN(e))return p("claude_chrome.extension_url.tab_switch",{success:!1,error:"invalid_tab_id"}),await M(t),!0;try{await u.initialize();const a=await u.findGroupByTab(e);if(!a||a.isUnmanaged)return p("claude_chrome.extension_url.tab_switch",{success:!1,error:"tab_not_managed"}),await M(t),!0;const s=await chrome.tabs.get(e);return void 0!==s.windowId&&await chrome.windows.update(s.windowId,{focused:!0}),await chrome.tabs.update(e,{active:!0}),p("claude_chrome.extension_url.tab_switch",{success:!0}),await M(t),!0}catch(a){return p("claude_chrome.extension_url.tab_switch",{success:!1}),await M(t),!0}}(e,t),!0}return!1}catch{return p("claude_chrome.extension_url.unknown_exception",{}),!1}}async function M(e){try{await chrome.tabs.remove(e)}catch(t){}}async function C(){try{const t=(await i.getAllPrompts()).filter(e=>e.repeatType&&"none"!==e.repeatType);if(0===t.length)return;let a=0,s=0;for(const n of t)try{await i.updateAlarmForPrompt(n),a++}catch(e){s++}try{await i.updateNextRunTimes()}catch(e){}}catch(e){}}c(),E();const R=new Map;async function O(e){chrome.sidePanel.setOptions({tabId:e,path:`sidepanel.html?tabId=${encodeURIComponent(e)}`,enabled:!0}),chrome.sidePanel.open({tabId:e}),await u.initialize(!0);const t=await u.findGroupByTab(e);if(t){if(t.isUnmanaged){try{await u.adoptOrphanedGroup(e,t.chromeGroupId)}catch(a){}return}}else{try{await u.createGroup(e)}catch(a){}E()}}async function U(e){const t=e.id;t&&await O(t)}async function D(a,s){const n=`session_${Date.now()}_${Math.random().toString(36).substring(2,11)}`,r=await chrome.windows.create({url:a.url||"about:blank",type:"normal",focused:!0});if(!r||!r.id||!r.tabs||0===r.tabs.length)throw new Error("Failed to create window for scheduled task");const o=r.tabs[0];if(!o.id)throw new Error("Failed to get tab in new window for scheduled task");await u.initialize(!0);await u.createGroup(o.id);await e(t.TARGET_TAB_ID,o.id),await async function(e){const{sessionId:t,skipPermissions:a,model:s}=e,n=chrome.runtime.getURL(`sidepanel.html?mode=window&sessionId=${t}${a?"&skipPermissions=true":""}${s?`&model=${encodeURIComponent(s)}`:""}`),r=await chrome.windows.create({url:n,type:"popup",width:500,height:768,left:100,top:100,focused:!0});if(!r)throw new Error("Failed to create sidepanel window");return r}({sessionId:n,skipPermissions:a.skipPermissions,model:a.model}),await async function(e){const{tabId:t,prompt:a,taskName:s,runLogId:n,sessionId:r,isScheduledTask:o}=e;return new Promise((e,i)=>{const c=3e4,d=Date.now();let u=!1;const m=async()=>{try{if(Date.now()-d>c)return void i(new Error("Timeout waiting for tab to load for task execution"));"complete"===(await chrome.tabs.get(t)).status?setTimeout(()=>{u||(u=!0,chrome.runtime.sendMessage({type:"EXECUTE_TASK",prompt:a,taskName:s,runLogId:n,windowSessionId:r,isScheduledTask:o},()=>{chrome.runtime.lastError?i(new Error(`Failed to send prompt: ${chrome.runtime.lastError.message}`)):e()}))},3e3):setTimeout(m,500)}catch(l){i(l)}};setTimeout(m,1e3)})}({tabId:o.id,prompt:a.prompt,taskName:a.name,runLogId:s,sessionId:n,isScheduledTask:!0})}chrome.runtime.onInstalled.addListener(async e=>{chrome.storage.local.remove(["updateAvailable"]),chrome.runtime.setUninstallURL("https://docs.google.com/forms/d/e/1FAIpQLSdLa1wTVkB2ml2abPI1FP9KiboOnp2N0c3aDmp5rWmaOybWwQ/viewform"),h(),await u.initialize(),await S(),e.reason===chrome.runtime.OnInstalledReason.INSTALL&&s(),E(),await C()}),chrome.runtime.onStartup.addListener(async()=>{h(),await S(),await u.initialize(),E(),await C()}),chrome.permissions.onAdded.addListener(e=>{e.permissions?.includes("nativeMessaging")&&E()}),chrome.permissions.onRemoved.addListener(e=>{e.permissions?.includes("nativeMessaging")&&A()}),chrome.action.onClicked.addListener(U),chrome.notifications.onClicked.addListener(async e=>{chrome.notifications.clear(e);const t=e.split("_");let a=null;if(t.length>=2&&"unknown"!==t[1]&&(a=parseInt(t[1],10)),a&&!isNaN(a))try{const e=await chrome.tabs.get(a);if(e&&e.windowId)return await chrome.windows.update(e.windowId,{focused:!0}),void(await chrome.tabs.update(a,{active:!0}))}catch{}const[s]=await chrome.tabs.query({active:!0,currentWindow:!0});s?.id&&s.windowId&&await chrome.windows.update(s.windowId,{focused:!0})}),chrome.commands.onCommand.addListener(e=>{"toggle-side-panel"===e&&chrome.tabs.query({active:!0,currentWindow:!0},e=>{const t=e[0];t&&U(t)})}),chrome.runtime.onUpdateAvailable.addListener(a=>{e(t.UPDATE_AVAILABLE,!0),p("claude_chrome.extension.update_available",{current_version:chrome.runtime.getManifest().version,new_version:a.version})}),chrome.runtime.onMessage.addListener((a,s,r)=>((async()=>{if("PLAY_NOTIFICATION_SOUND"!==a.type){if("open_side_panel"===a.type){const e=a.tabId||s.tab?.id;if(!e)return void r({success:!1});if(await O(e),a.prompt){const e=async(t=0)=>{try{const e=0===t?800:500;await new Promise(t=>setTimeout(t,e)),await new Promise((e,t)=>{chrome.runtime.sendMessage({type:"POPULATE_INPUT_TEXT",prompt:a.prompt,permissionMode:a.permissionMode,selectedModel:a.selectedModel,attachments:a.attachments},()=>{chrome.runtime.lastError?t(new Error(chrome.runtime.lastError.message)):e()})})}catch(s){t<5&&await e(t+1)}};await e()}if(a.conversationUuid){const e=async(t=0)=>{try{const e=0===t?800:500;await new Promise(t=>setTimeout(t,e)),await new Promise((e,t)=>{chrome.runtime.sendMessage({type:"LOAD_CONVERSATION",conversationUuid:a.conversationUuid},()=>{chrome.runtime.lastError?t(new Error(chrome.runtime.lastError.message)):e()})})}catch(s){t<5&&await e(t+1)}};await e()}return void r({success:!0})}if("logout"===a.type)try{await n(),await u.clearAllGroups(),await w(),r({success:!0})}catch(o){}else if("check_native_host_status"===a.type){const e=await async function(){return y&&g?(I&&clearTimeout(I),new Promise(e=>{b=e,y.postMessage({type:"get_status"}),I=setTimeout(()=>{b=null,e({nativeHostInstalled:g,mcpConnected:T})},1e4)})):{nativeHostInstalled:g,mcpConnected:T}}();r({status:e})}else if("SEND_MCP_NOTIFICATION"===a.type){const e=function(e,t){if(!y)return!1;const a={type:"notification",jsonrpc:"2.0",method:e,params:t||{}};return y.postMessage(a),!0}(a.method,a.params);r({success:e})}else if("OPEN_OPTIONS_WITH_TASK"===a.type)try{await e(t.PENDING_SCHEDULED_TASK,a.task);const s=chrome.runtime.getURL("options.html"),n=(await chrome.tabs.query({})).find(e=>e.url?.startsWith(s));n&&n.id?(await chrome.tabs.update(n.id,{url:chrome.runtime.getURL("options.html#prompts"),active:!0}),n.windowId&&await chrome.windows.update(n.windowId,{focused:!0})):await chrome.tabs.create({url:chrome.runtime.getURL("options.html#prompts")}),r({success:!0})}catch(o){r({success:!1,error:o.message})}else if("EXECUTE_SCHEDULED_TASK"===a.type)try{const{task:e,runLogId:t}=a;await D(e,t),p("claude_chrome.scheduled_task.executed",{task_id:e.id,task_name:e.name,success:!0,execution_type:a.isManual?"manual":"automatic"}),r({success:!0})}catch(o){p("claude_chrome.scheduled_task.executed",{task_id:a.task.id,task_name:a.task.name,success:!1,execution_type:a.isManual?"manual":"automatic",error:o.message}),r({success:!1,error:o.message})}else if("STOP_AGENT"===a.type){let e;if("CURRENT_TAB"===a.fromTabId&&s.tab?.id){e=await u.getMainTabId(s.tab.id)||s.tab.id}else"number"==typeof a.fromTabId&&(e=a.fromTabId);e&&chrome.runtime.sendMessage({type:"STOP_AGENT",targetTabId:e}),r({success:!0})}else if("SWITCH_TO_MAIN_TAB"===a.type)if(s.tab?.id)try{await u.initialize(!0);const e=await u.getMainTabId(s.tab.id);if(e){await chrome.tabs.update(e,{active:!0});const t=await chrome.tabs.get(e);t.windowId&&await chrome.windows.update(t.windowId,{focused:!0}),r({success:!0})}else r({success:!1,error:"No main tab found"})}catch(o){r({success:!1,error:o.message})}else r({success:!1,error:"No sender tab"});else"SECONDARY_TAB_CHECK_MAIN"===a.type?chrome.runtime.sendMessage({type:"MAIN_TAB_ACK_REQUEST",secondaryTabId:a.secondaryTabId,mainTabId:a.mainTabId,timestamp:a.timestamp},e=>{r(e?.success?{success:!0}:{success:!1})}):"MAIN_TAB_ACK_RESPONSE"===a.type?r({success:a.success}):"STATIC_INDICATOR_HEARTBEAT"===a.type?(async()=>{const e=s.tab?.id;if(e)try{const t=(await chrome.tabs.get(e)).groupId;if(void 0===t||t===chrome.tabGroups.TAB_GROUP_ID_NONE)return void r({success:!1});if(await u.findGroupByTab(e))return void r({success:!0});const a=await chrome.tabs.query({groupId:t}),s=async t=>{if(t>=a.length)return void r({success:!1});const n=a[t];if(n.id===e||!n.id)return void(await s(t+1));const o=n.id,i=Date.now(),c=R.get(o);if(c&&i-c.timestamp<3e3)return c.isAlive?void r({success:!0}):void(await s(t+1));chrome.runtime.sendMessage({type:"MAIN_TAB_ACK_REQUEST",secondaryTabId:e,mainTabId:o,timestamp:i},async e=>{const a=e?.success??!1;R.set(o,{timestamp:i,isAlive:a}),a?r({success:!0}):await s(t+1)})};await s(0)}catch(o){r({success:!1})}else r({success:!1})})():"DISMISS_STATIC_INDICATOR_FOR_GROUP"===a.type&&(async()=>{const e=s.tab?.id;if(e)try{const t=(await chrome.tabs.get(e)).groupId;if(void 0===t||t===chrome.tabGroups.TAB_GROUP_ID_NONE)return void r({success:!1});await u.initialize(),await u.dismissStaticIndicatorsForGroup(t),r({success:!0})}catch(o){r({success:!1})}else r({success:!1})})()}else try{await async function(){if(chrome.offscreen)try{try{await chrome.offscreen.closeDocument()}catch{}await chrome.offscreen.createDocument({url:"offscreen.html",reasons:[chrome.offscreen.Reason.AUDIO_PLAYBACK],justification:"Play notification sounds when user is on different tab"})}catch(o){throw o}}(),await chrome.runtime.sendMessage({type:"PLAY_NOTIFICATION_SOUND",audioUrl:a.audioUrl,volume:a.volume||.5}),r({success:!0})}catch(o){r({success:!1,error:o.message})}})(),!0)),chrome.tabs.onRemoved.addListener(async e=>{await u.handleTabClosed(e)}),chrome.webNavigation.onBeforeNavigate.addListener(async e=>{0===e.frameId&&await k(e.url,e.tabId)}),chrome.alarms.onAlarm.addListener(async e=>{if(e.name.startsWith("prompt_"))try{const n=e.name,o=await chrome.storage.local.get(["savedPrompts"]),i=(o.savedPrompts||[]).find(e=>e.id===n);if(i){const e=`${Date.now()}_${Math.random().toString(36).substring(2,11)}`;let o=null;try{const t={id:i.id,name:i.command||"Scheduled Task",prompt:i.prompt,url:i.url,enabled:!0,skipPermissions:!1!==i.skipPermissions,model:i.model};await D(t,e)}catch(t){o=t instanceof Error?t:new Error(String(t));try{await chrome.notifications.create({type:"basic",iconUrl:"/icon-128.png",title:"Scheduled Task Failed",message:`Task "${i.command||"Scheduled Task"}" failed to execute. ${o.message}`,priority:2})}catch(a){}}if("monthly"===i.repeatType||"annually"===i.repeatType)try{const{SavedPromptsService:e}=await r(async()=>{const{SavedPromptsService:e}=await import("./react-core.js").then(e=>e.N);return{SavedPromptsService:e}},[]);await e.updateAlarmForPrompt(i)}catch(t){const e=`retry_${n}`;try{await chrome.alarms.create(e,{delayInMinutes:1})}catch(s){}try{await chrome.notifications.create({type:"basic",iconUrl:"/icon-128.png",title:"Scheduled Task Setup Failed",message:`Failed to schedule next occurrence of "${i.command||"Scheduled Task"}". Please check the task settings.`,priority:2})}catch(a){}}}}catch(t){}else if(e.name.startsWith("retry_"))try{const s=e.name.replace("retry_",""),n=await chrome.storage.local.get(["savedPrompts"]),o=(n.savedPrompts||[]).find(e=>e.id===s);if(o&&("monthly"===o.repeatType||"annually"===o.repeatType))try{const{SavedPromptsService:e}=await r(async()=>{const{SavedPromptsService:e}=await import("./react-core.js").then(e=>e.N);return{SavedPromptsService:e}},[]);await e.updateAlarmForPrompt(o)}catch(t){try{await chrome.notifications.create({type:"basic",iconUrl:"/icon-128.png",title:"Scheduled Task Needs Attention",message:`Could not automatically reschedule "${o.command||"Scheduled Task"}". Please edit the task to reschedule it.`,priority:2})}catch(a){}}}catch(t){}}),chrome.runtime.onMessageExternal.addListener((e,t,a)=>((async()=>{var s;if((s=t.origin)&&["https://claude.ai"].includes(s))if("oauth_redirect"===e.type){const s=await o(e.redirect_uri,t?.tab?.id);a(s),s.success&&E()}else"ping"===e.type?a({success:!0,exists:!0}):"onboarding_task"===e.type&&(chrome.runtime.sendMessage({type:"POPULATE_INPUT_TEXT",prompt:e.payload?.prompt}),a({success:!0}));else a({success:!1,error:"Untrusted origin"})})(),!0));
+import {
+  s as setStorageValue,
+  S as StorageKeys,
+  h as getApiConfig,
+  o as openSidePanelFromTab,
+  H as handleLogout,
+  _ as dynamicImport,
+  I as handleOAuthRedirect,
+  b as SavedPromptsService,
+} from "./react-core.js";
+
+const initializeExtension = () => {};
+
+import {
+  L as notifyDisconnection,
+  t as TabGroupManager,
+  M as createErrorResponse,
+  N as executeToolRequest,
+} from "./mcp-tools.js";
+// anthropic-client.js removed - find tool now handled by MCP server
+
+// Native messaging connection state
+let nativePort = null;
+let connectedHostName = null;
+let isConnecting = false;
+let isNativeHostInstalled = false;
+let isMcpConnected = false;
+
+// Status request handling
+let statusResolve = null;
+let statusTimeout = null;
+
+/**
+ * Handle native messaging errors, detecting if the host is not found
+ */
+function handleNativeMessagingError(errorMessage) {
+  if (errorMessage?.includes("native messaging host not found")) {
+    isNativeHostInstalled = false;
+  }
+}
+
+/**
+ * Attempt to connect to the native messaging host
+ * Tries multiple host configurations in order of priority
+ */
+async function connectToNativeHost() {
+  try {
+    return await (async function attemptConnection() {
+      // Already connected
+      if (nativePort) {
+        return true;
+      }
+
+      // Connection already in progress
+      if (isConnecting) {
+        return false;
+      }
+
+      isConnecting = true;
+
+      try {
+        // Check if we have native messaging permission
+        const hasNativeMessagingPermission = await chrome.permissions.contains({
+          permissions: ["nativeMessaging"],
+        });
+
+        if (!hasNativeMessagingPermission) {
+          return false;
+        }
+
+        // Check if connectNative is available
+        if (typeof chrome.runtime.connectNative !== "function") {
+          return false;
+        }
+
+        // Try different native host configurations
+        const hostConfigurations = [
+          { name: "com.browsermcp.native_host_desktop", label: "Desktop" },
+          { name: "com.browsermcp.native_host", label: "Claude Code" },
+        ];
+
+        for (const hostConfig of hostConfigurations) {
+          try {
+            const port = chrome.runtime.connectNative(hostConfig.name);
+
+            // Try to establish connection with a ping/pong handshake
+            const connectionSuccessful = await new Promise((resolve) => {
+              let resolved = false;
+
+              const handleDisconnect = () => {
+                if (!resolved) {
+                  resolved = true;
+                  // Clear any error from lastError
+                  chrome.runtime.lastError;
+                  resolve(false);
+                }
+              };
+
+              const handleMessage = (message) => {
+                if (!resolved && message.type === "pong") {
+                  resolved = true;
+                  port.onDisconnect.removeListener(handleDisconnect);
+                  port.onMessage.removeListener(handleMessage);
+                  resolve(true);
+                }
+              };
+
+              port.onDisconnect.addListener(handleDisconnect);
+              port.onMessage.addListener(handleMessage);
+
+              try {
+                port.postMessage({ type: "ping" });
+              } catch (error) {
+                if (!resolved) {
+                  resolved = true;
+                  resolve(false);
+                }
+                return;
+              }
+
+              // Timeout after 10 seconds
+              setTimeout(() => {
+                if (!resolved) {
+                  resolved = true;
+                  port.onDisconnect.removeListener(handleDisconnect);
+                  port.onMessage.removeListener(handleMessage);
+                  resolve(false);
+                }
+              }, 10000);
+            });
+
+            if (connectionSuccessful) {
+              // Store the successful connection
+              nativePort = port;
+              connectedHostName = hostConfig.name;
+              isNativeHostInstalled = true;
+
+              // Set up message handler for incoming messages
+              nativePort.onMessage.addListener(async (message) => {
+                await handleNativeMessage(message);
+              });
+
+              // Set up disconnect handler
+              nativePort.onDisconnect.addListener(() => {
+                const errorMessage = chrome.runtime.lastError?.message;
+                nativePort = null;
+                connectedHostName = null;
+                isMcpConnected = false;
+                setStorageValue(StorageKeys.MCP_CONNECTED, false);
+                handleNativeMessagingError(errorMessage);
+                notifyDisconnection();
+              });
+
+              // Request initial status
+              nativePort.postMessage({ type: "get_status" });
+              return true;
+            }
+
+            // This host didn't work, disconnect and try next
+            port.disconnect();
+          } catch (error) {
+            // Continue to next host configuration
+          }
+        }
+
+        // No host configuration worked
+        return false;
+      } catch (error) {
+        if (error instanceof Error) {
+          handleNativeMessagingError(error.message);
+        }
+        return false;
+      } finally {
+        isConnecting = false;
+      }
+    })();
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Disconnect from native host and revoke permissions
+ */
+async function disconnectNativeHost() {
+  try {
+    await chrome.permissions.remove({ permissions: ["nativeMessaging"] });
+    nativePort?.disconnect();
+    nativePort = null;
+    connectedHostName = null;
+    isConnecting = false;
+    isNativeHostInstalled = false;
+    isMcpConnected = false;
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Handle incoming messages from native host
+ */
+async function handleNativeMessage(message) {
+  switch (message.type) {
+    case "tool_request":
+      await handleToolRequest(message);
+      break;
+
+    case "status_response":
+      if (statusResolve) {
+        clearTimeout(statusTimeout);
+        statusTimeout = null;
+        statusResolve({
+          nativeHostInstalled: isNativeHostInstalled,
+          mcpConnected: isMcpConnected,
+        });
+        statusResolve = null;
+      }
+      break;
+
+    case "mcp_connected":
+      handleMcpConnected();
+      break;
+
+    case "set_skip_permissions":
+      self.__skipPermissions = !!message.value;
+      break;
+
+    case "mcp_disconnected":
+      isMcpConnected = false;
+      setStorageValue(StorageKeys.MCP_CONNECTED, false);
+      TabGroupManager.stopTabGroupChangeListener();
+      break;
+  }
+}
+
+/**
+ * Handle tool execution request from native host
+ */
+async function handleToolRequest(request) {
+  try {
+    const { method, params } = request;
+
+    if (method === "execute_tool") {
+      if (!params?.tool) {
+        sendToolResponse(createErrorResponse("No tool specified"));
+        return;
+      }
+
+      const clientId = params.client_id;
+      const tabGroupId = params.args?.tabGroupId;
+      const validatedTabGroupId =
+        typeof tabGroupId === "number" ? tabGroupId : undefined;
+      const tabId = params.args?.tabId;
+      const validatedTabId = typeof tabId === "number" ? tabId : undefined;
+
+      const toolName = params.tool;
+
+      // Handle clipboard_read tool
+      if (toolName === "clipboard_read") {
+        try {
+          const text = await navigator.clipboard.readText();
+          sendToolResponse({ content: text }, clientId);
+        } catch (err) {
+          sendToolResponse(createErrorResponse(err.message), clientId);
+        }
+        return;
+      }
+
+      // Handle clipboard_write tool
+      if (toolName === "clipboard_write") {
+        try {
+          await navigator.clipboard.writeText(params.args?.text || "");
+          sendToolResponse({ content: "Text copied to clipboard" }, clientId);
+        } catch (err) {
+          sendToolResponse(createErrorResponse(err.message), clientId);
+        }
+        return;
+      }
+
+      // Handle get_cookies tool
+      if (toolName === "get_cookies") {
+        try {
+          const cookies = await chrome.cookies.getAll({
+            url: params.args?.url,
+          });
+          const filtered = params.args?.name
+            ? cookies.filter((c) => c.name === params.args.name)
+            : cookies;
+          sendToolResponse(
+            { content: JSON.stringify(filtered, null, 2) },
+            clientId
+          );
+        } catch (err) {
+          sendToolResponse(createErrorResponse(err.message), clientId);
+        }
+        return;
+      }
+
+      // Handle set_cookie tool
+      if (toolName === "set_cookie") {
+        try {
+          const opts = {
+            url: params.args?.url,
+            name: params.args?.name,
+            value: params.args?.value,
+          };
+          if (params.args?.domain) opts.domain = params.args.domain;
+          if (params.args?.path) opts.path = params.args.path;
+          if (params.args?.secure) opts.secure = params.args.secure;
+          if (params.args?.httpOnly) opts.httpOnly = params.args.httpOnly;
+          if (params.args?.expirationDate)
+            opts.expirationDate = params.args.expirationDate;
+          const cookie = await chrome.cookies.set(opts);
+          sendToolResponse(
+            { content: JSON.stringify(cookie, null, 2) },
+            clientId
+          );
+        } catch (err) {
+          sendToolResponse(createErrorResponse(err.message), clientId);
+        }
+        return;
+      }
+
+      // Handle delete_cookie tool
+      if (toolName === "delete_cookie") {
+        try {
+          await chrome.cookies.remove({
+            url: params.args?.url,
+            name: params.args?.name,
+          });
+          sendToolResponse({ content: "Cookie deleted" }, clientId);
+        } catch (err) {
+          sendToolResponse(createErrorResponse(err.message), clientId);
+        }
+        return;
+      }
+
+      // Handle search_history tool
+      if (toolName === "search_history") {
+        try {
+          const opts = {
+            text: params.args?.query || "",
+            maxResults: params.args?.maxResults || 100,
+          };
+          if (params.args?.startTime) opts.startTime = params.args.startTime;
+          if (params.args?.endTime) opts.endTime = params.args.endTime;
+          const results = await chrome.history.search(opts);
+          sendToolResponse(
+            { content: JSON.stringify(results, null, 2) },
+            clientId
+          );
+        } catch (err) {
+          sendToolResponse(createErrorResponse(err.message), clientId);
+        }
+        return;
+      }
+
+      // Handle other tools through the general tool executor
+      sendToolResponse(
+        await executeToolRequest({
+          toolName: params.tool,
+          args: params.args || {},
+          tabId: validatedTabId,
+          tabGroupId: validatedTabGroupId,
+          clientId: clientId,
+        }),
+        clientId
+      );
+    } else {
+      sendToolResponse({ content: `Unknown method: ${method}` });
+    }
+  } catch (error) {
+    sendToolResponse(
+      createErrorResponse(
+        `Tool execution failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      )
+    );
+  }
+}
+
+/**
+ * Handle MCP connected event
+ */
+function handleMcpConnected() {
+  isMcpConnected = true;
+  setStorageValue(StorageKeys.MCP_CONNECTED, true);
+  TabGroupManager.initialize();
+  TabGroupManager.startTabGroupChangeListener();
+}
+
+/**
+ * Enhance error message for permission denials
+ */
+function enhancePermissionDenialMessage(content) {
+  let enhancedContent;
+  const permissionDenialSuffix =
+    "IMPORTANT: The user has explicitly declined this action. Do not attempt to use other tools or workarounds. Instead, acknowledge the denial and ask the user how they would prefer to proceed.";
+
+  if (typeof content === "string") {
+    if (content.includes("Permission denied by user")) {
+      enhancedContent = `${content} - ${permissionDenialSuffix}`;
+    } else {
+      enhancedContent = content;
+    }
+  } else {
+    // Handle array of content items
+    enhancedContent = content.map((item) => {
+      if (
+        typeof item === "object" &&
+        item !== null &&
+        "text" in item &&
+        typeof item.text === "string" &&
+        item.text.includes("Permission denied by user")
+      ) {
+        return { ...item, text: `${content} - ${permissionDenialSuffix}` };
+      }
+      return item;
+    });
+  }
+
+  return { type: "tool_response", error: { content: enhancedContent } };
+}
+
+/**
+ * Send tool response back to native host
+ */
+function sendToolResponse({ content, is_error }, clientId) {
+  if (!nativePort) {
+    return;
+  }
+
+  if (!content || (typeof content !== "string" && !Array.isArray(content))) {
+    return;
+  }
+
+  let response;
+  if (is_error) {
+    response = enhancePermissionDenialMessage(content);
+  } else {
+    response = { type: "tool_response", result: { content: content } };
+  }
+
+  nativePort.postMessage(response);
+}
+
+/**
+ * Set up declarative net request rules for API requests
+ */
+async function setupNetRequestRules() {
+  const apiConfig = getApiConfig();
+  const userAgent = `claude-browser-extension/${chrome.runtime.getManifest().version} (external) ${navigator.userAgent}`;
+
+  const rules = [
+    {
+      id: 1,
+      priority: 1,
+      action: {
+        type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
+        requestHeaders: [
+          {
+            header: "User-Agent",
+            operation: chrome.declarativeNetRequest.HeaderOperation.SET,
+            value: userAgent,
+          },
+        ],
+      },
+      condition: {
+        urlFilter: `${apiConfig.apiBaseUrl}/*`,
+        resourceTypes: [
+          chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
+          chrome.declarativeNetRequest.ResourceType.OTHER,
+        ],
+      },
+    },
+  ];
+
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [1],
+    addRules: rules,
+  });
+}
+
+// Extension URL handling path prefix
+const EXTENSION_URL_PREFIX = "/chrome/";
+
+/**
+ * Handle extension-specific URLs (clau.de/chrome/*)
+ */
+async function handleExtensionUrl(url, tabId) {
+  try {
+    const parsedUrl = new URL(url);
+
+    // Only handle clau.de URLs
+    if (parsedUrl.host !== "clau.de") {
+      return false;
+    }
+
+    // Handle permissions URL
+    if (parsedUrl.pathname.toLowerCase() === "/chrome/permissions") {
+      await handlePermissionsUrl(tabId);
+      return true;
+    }
+
+    // Only handle /chrome/* paths from here
+    if (!parsedUrl.pathname.startsWith(EXTENSION_URL_PREFIX)) {
+      return false;
+    }
+
+    const pathCommand = parsedUrl.pathname.substring(8).toLowerCase();
+
+    // Handle reconnect command
+    if (pathCommand === "reconnect") {
+      await handleReconnectUrl(tabId);
+      return true;
+    }
+
+    // Handle tab switching
+    if (pathCommand.startsWith("tab/")) {
+      const targetTabId = parseInt(pathCommand.substring(4), 10);
+      await handleTabSwitchUrl(targetTabId, tabId);
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Handle /chrome/permissions URL
+ */
+async function handlePermissionsUrl(tabId) {
+  try {
+    const optionsUrl = chrome.runtime.getURL("options.html#permissions");
+    await chrome.tabs.create({ url: optionsUrl });
+  } catch (error) {
+    // Ignore errors
+  } finally {
+    await closeTab(tabId);
+  }
+}
+
+/**
+ * Handle /chrome/reconnect URL
+ */
+async function handleReconnectUrl(tabId) {
+  try {
+    await disconnectNativeHost();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await connectToNativeHost();
+  } catch (error) {
+    // Reconnect failed
+  } finally {
+    await closeTab(tabId);
+  }
+}
+
+/**
+ * Handle /chrome/tab/* URL for switching tabs
+ */
+async function handleTabSwitchUrl(targetTabId, currentTabId) {
+  if (isNaN(targetTabId)) {
+    await closeTab(currentTabId);
+    return true;
+  }
+
+  try {
+    await TabGroupManager.initialize();
+    const group = await TabGroupManager.findGroupByTab(targetTabId);
+
+    if (!group || group.isUnmanaged) {
+      await closeTab(currentTabId);
+      return true;
+    }
+
+    const tab = await chrome.tabs.get(targetTabId);
+
+    if (tab.windowId !== undefined) {
+      await chrome.windows.update(tab.windowId, { focused: true });
+    }
+
+    await chrome.tabs.update(targetTabId, { active: true });
+    await closeTab(currentTabId);
+    return true;
+  } catch (error) {
+    await closeTab(currentTabId);
+    return true;
+  }
+}
+
+/**
+ * Close a tab by ID, silently ignoring errors
+ */
+async function closeTab(tabId) {
+  try {
+    await chrome.tabs.remove(tabId);
+  } catch (error) {
+    // Ignore errors when closing tabs
+  }
+}
+
+/**
+ * Initialize alarms for scheduled prompts
+ */
+async function initializeScheduledPromptAlarms() {
+  try {
+    const allPrompts = await SavedPromptsService.getAllPrompts();
+    const repeatingPrompts = allPrompts.filter(
+      (prompt) => prompt.repeatType && prompt.repeatType !== "none"
+    );
+
+    if (repeatingPrompts.length === 0) {
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const prompt of repeatingPrompts) {
+      try {
+        await SavedPromptsService.updateAlarmForPrompt(prompt);
+        successCount++;
+      } catch (error) {
+        failCount++;
+      }
+    }
+
+    try {
+      await SavedPromptsService.updateNextRunTimes();
+    } catch (error) {
+      // Ignore errors
+    }
+  } catch (error) {
+    // Ignore errors
+  }
+}
+
+// Initialize extension
+initializeExtension();
+connectToNativeHost();
+
+// Cache for main tab aliveness checks
+const mainTabAlivenessCache = new Map();
+
+/**
+ * Ensure a tab is part of a managed group, creating one if needed
+ */
+async function ensureTabInManagedGroup(tabId) {
+  await TabGroupManager.initialize(true);
+  const group = await TabGroupManager.findGroupByTab(tabId);
+
+  if (group) {
+    if (group.isUnmanaged) {
+      try {
+        await TabGroupManager.adoptOrphanedGroup(tabId, group.chromeGroupId);
+      } catch (error) {
+        // Ignore errors
+      }
+      return;
+    }
+  } else {
+    try {
+      await TabGroupManager.createGroup(tabId);
+    } catch (error) {
+      // Ignore errors
+    }
+    connectToNativeHost();
+  }
+}
+
+/**
+ * Handle action button click on a tab
+ */
+async function handleActionClick(tab) {
+  const tabId = tab.id;
+  if (tabId) {
+    await ensureTabInManagedGroup(tabId);
+  }
+}
+
+/**
+ * Create a new window and group for a scheduled task
+ */
+async function executeScheduledTaskInNewWindow(task, runLogId) {
+  const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+  const newWindow = await chrome.windows.create({
+    url: task.url || "about:blank",
+    type: "normal",
+    focused: true,
+  });
+
+  if (!newWindow || !newWindow.id || !newWindow.tabs || newWindow.tabs.length === 0) {
+    throw new Error("Failed to create window for scheduled task");
+  }
+
+  const newTab = newWindow.tabs[0];
+  if (!newTab.id) {
+    throw new Error("Failed to get tab in new window for scheduled task");
+  }
+
+  await TabGroupManager.initialize(true);
+  await TabGroupManager.createGroup(newTab.id);
+  await setStorageValue(StorageKeys.TARGET_TAB_ID, newTab.id);
+}
+
+// Extension lifecycle event handlers
+
+chrome.runtime.onInstalled.addListener(async (details) => {
+  chrome.storage.local.remove(["updateAvailable"]);
+  await TabGroupManager.initialize();
+  await setupNetRequestRules();
+  connectToNativeHost();
+  await initializeScheduledPromptAlarms();
+});
+
+chrome.runtime.onStartup.addListener(async () => {
+  await setupNetRequestRules();
+  await TabGroupManager.initialize();
+  connectToNativeHost();
+  await initializeScheduledPromptAlarms();
+});
+
+chrome.permissions.onAdded.addListener((permissions) => {
+  if (permissions.permissions?.includes("nativeMessaging")) {
+    connectToNativeHost();
+  }
+});
+
+chrome.permissions.onRemoved.addListener((permissions) => {
+  if (permissions.permissions?.includes("nativeMessaging")) {
+    disconnectNativeHost();
+  }
+});
+
+chrome.action.onClicked.addListener(handleActionClick);
+
+chrome.notifications.onClicked.addListener(async (notificationId) => {
+  chrome.notifications.clear(notificationId);
+
+  const parts = notificationId.split("_");
+  let tabId = null;
+
+  if (parts.length >= 2 && parts[1] !== "unknown") {
+    tabId = parseInt(parts[1], 10);
+  }
+
+  if (tabId && !isNaN(tabId)) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab && tab.windowId) {
+        await chrome.windows.update(tab.windowId, { focused: true });
+        await chrome.tabs.update(tabId, { active: true });
+        return;
+      }
+    } catch {
+      // Tab doesn't exist, fall through to focus current window
+    }
+  }
+
+  // Focus the current active tab's window
+  const [activeTab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  if (activeTab?.id && activeTab.windowId) {
+    await chrome.windows.update(activeTab.windowId, { focused: true });
+  }
+});
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "toggle-side-panel") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs[0];
+      if (activeTab) {
+        handleActionClick(activeTab);
+      }
+    });
+  }
+});
+
+chrome.runtime.onUpdateAvailable.addListener((details) => {
+  setStorageValue(StorageKeys.UPDATE_AVAILABLE, true);
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  (async () => {
+    // Handle notification sound playback
+    if (message.type === "PLAY_NOTIFICATION_SOUND") {
+      try {
+        await createOffscreenDocument();
+        await chrome.runtime.sendMessage({
+          type: "PLAY_NOTIFICATION_SOUND",
+          audioUrl: message.audioUrl,
+          volume: message.volume || 0.5,
+        });
+        sendResponse({ success: true });
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+      return;
+    }
+
+    // Handle open side panel request
+    if (message.type === "open_side_panel") {
+      const tabId = message.tabId || sender.tab?.id;
+      if (!tabId) {
+        sendResponse({ success: false });
+        return;
+      }
+
+      await ensureTabInManagedGroup(tabId);
+
+      // If a prompt is provided, populate the input
+      if (message.prompt) {
+        await retryPopulateInput(message);
+      }
+
+      // If a conversation UUID is provided, load it
+      if (message.conversationUuid) {
+        await retryLoadConversation(message.conversationUuid);
+      }
+
+      sendResponse({ success: true });
+      return;
+    }
+
+    // Handle logout
+    if (message.type === "logout") {
+      try {
+        await handleLogout();
+        await TabGroupManager.clearAllGroups();
+        sendResponse({ success: true });
+      } catch (error) {
+        // Ignore errors
+      }
+      return;
+    }
+
+    // Handle native host status check
+    if (message.type === "check_native_host_status") {
+      const status = await getNativeHostStatus();
+      sendResponse({ status: status });
+      return;
+    }
+
+    // Handle MCP notification sending
+    if (message.type === "SEND_MCP_NOTIFICATION") {
+      const success = sendMcpNotification(message.method, message.params);
+      sendResponse({ success: success });
+      return;
+    }
+
+    // Handle opening options with a scheduled task
+    if (message.type === "OPEN_OPTIONS_WITH_TASK") {
+      try {
+        await setStorageValue(StorageKeys.PENDING_SCHEDULED_TASK, message.task);
+        const optionsUrl = chrome.runtime.getURL("options.html");
+        const allTabs = await chrome.tabs.query({});
+        const existingOptionsTab = allTabs.find((tab) =>
+          tab.url?.startsWith(optionsUrl)
+        );
+
+        if (existingOptionsTab && existingOptionsTab.id) {
+          await chrome.tabs.update(existingOptionsTab.id, {
+            url: chrome.runtime.getURL("options.html#prompts"),
+            active: true,
+          });
+          if (existingOptionsTab.windowId) {
+            await chrome.windows.update(existingOptionsTab.windowId, {
+              focused: true,
+            });
+          }
+        } else {
+          await chrome.tabs.create({
+            url: chrome.runtime.getURL("options.html#prompts"),
+          });
+        }
+        sendResponse({ success: true });
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+      return;
+    }
+
+    // Handle scheduled task execution
+    if (message.type === "EXECUTE_SCHEDULED_TASK") {
+      try {
+        const { task, runLogId } = message;
+        await executeScheduledTaskInNewWindow(task, runLogId);
+        sendResponse({ success: true });
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+      return;
+    }
+
+    // Handle stop agent request
+    if (message.type === "STOP_AGENT") {
+      let targetTabId;
+      if (message.fromTabId === "CURRENT_TAB" && sender.tab?.id) {
+        targetTabId =
+          (await TabGroupManager.getMainTabId(sender.tab.id)) || sender.tab.id;
+      } else if (typeof message.fromTabId === "number") {
+        targetTabId = message.fromTabId;
+      }
+
+      if (targetTabId) {
+        chrome.runtime.sendMessage({
+          type: "STOP_AGENT",
+          targetTabId: targetTabId,
+        });
+      }
+      sendResponse({ success: true });
+      return;
+    }
+
+    // Handle switch to main tab request
+    if (message.type === "SWITCH_TO_MAIN_TAB") {
+      if (!sender.tab?.id) {
+        sendResponse({ success: false, error: "No sender tab" });
+        return;
+      }
+
+      try {
+        await TabGroupManager.initialize(true);
+        const mainTabId = await TabGroupManager.getMainTabId(sender.tab.id);
+
+        if (mainTabId) {
+          await chrome.tabs.update(mainTabId, { active: true });
+          const mainTab = await chrome.tabs.get(mainTabId);
+          if (mainTab.windowId) {
+            await chrome.windows.update(mainTab.windowId, { focused: true });
+          }
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: "No main tab found" });
+        }
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+      return;
+    }
+
+    // Handle secondary tab checking main tab status
+    if (message.type === "SECONDARY_TAB_CHECK_MAIN") {
+      chrome.runtime.sendMessage(
+        {
+          type: "MAIN_TAB_ACK_REQUEST",
+          secondaryTabId: message.secondaryTabId,
+          mainTabId: message.mainTabId,
+          timestamp: message.timestamp,
+        },
+        (response) => {
+          sendResponse(response?.success ? { success: true } : { success: false });
+        }
+      );
+      return;
+    }
+
+    // Handle main tab acknowledgment response
+    if (message.type === "MAIN_TAB_ACK_RESPONSE") {
+      sendResponse({ success: message.success });
+      return;
+    }
+
+    // Handle static indicator heartbeat
+    if (message.type === "STATIC_INDICATOR_HEARTBEAT") {
+      await handleStaticIndicatorHeartbeat(sender, sendResponse);
+      return;
+    }
+
+    // Handle dismissing static indicator for a group
+    if (message.type === "DISMISS_STATIC_INDICATOR_FOR_GROUP") {
+      await handleDismissStaticIndicator(sender, sendResponse);
+      return;
+    }
+  })();
+
+  // Return true to indicate async response
+  return true;
+});
+
+/**
+ * Create offscreen document for audio playback
+ */
+async function createOffscreenDocument() {
+  if (!chrome.offscreen) {
+    return;
+  }
+
+  try {
+    // Close any existing offscreen document
+    try {
+      await chrome.offscreen.closeDocument();
+    } catch {
+      // Ignore errors
+    }
+
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+      justification: "Play notification sounds when user is on different tab",
+    });
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Retry populating the input text with exponential backoff
+ */
+async function retryPopulateInput(message, attempt = 0) {
+  try {
+    const delay = attempt === 0 ? 800 : 500;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "POPULATE_INPUT_TEXT",
+          prompt: message.prompt,
+          permissionMode: message.permissionMode,
+          selectedModel: message.selectedModel,
+          attachments: message.attachments,
+        },
+        () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  } catch (error) {
+    if (attempt < 5) {
+      await retryPopulateInput(message, attempt + 1);
+    }
+  }
+}
+
+/**
+ * Retry loading a conversation with exponential backoff
+ */
+async function retryLoadConversation(conversationUuid, attempt = 0) {
+  try {
+    const delay = attempt === 0 ? 800 : 500;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "LOAD_CONVERSATION",
+          conversationUuid: conversationUuid,
+        },
+        () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  } catch (error) {
+    if (attempt < 5) {
+      await retryLoadConversation(conversationUuid, attempt + 1);
+    }
+  }
+}
+
+/**
+ * Get current native host connection status
+ */
+async function getNativeHostStatus() {
+  if (!nativePort || !isNativeHostInstalled) {
+    return {
+      nativeHostInstalled: isNativeHostInstalled,
+      mcpConnected: isMcpConnected,
+    };
+  }
+
+  // Clear any existing status timeout
+  if (statusTimeout) {
+    clearTimeout(statusTimeout);
+  }
+
+  return new Promise((resolve) => {
+    statusResolve = resolve;
+    nativePort.postMessage({ type: "get_status" });
+
+    statusTimeout = setTimeout(() => {
+      statusResolve = null;
+      resolve({
+        nativeHostInstalled: isNativeHostInstalled,
+        mcpConnected: isMcpConnected,
+      });
+    }, 10000);
+  });
+}
+
+/**
+ * Send an MCP notification to the native host
+ */
+function sendMcpNotification(method, params) {
+  if (!nativePort) {
+    return false;
+  }
+
+  const notification = {
+    type: "notification",
+    jsonrpc: "2.0",
+    method: method,
+    params: params || {},
+  };
+
+  nativePort.postMessage(notification);
+  return true;
+}
+
+/**
+ * Handle static indicator heartbeat check
+ */
+async function handleStaticIndicatorHeartbeat(sender, sendResponse) {
+  const senderTabId = sender.tab?.id;
+
+  if (!senderTabId) {
+    sendResponse({ success: false });
+    return;
+  }
+
+  try {
+    const senderTab = await chrome.tabs.get(senderTabId);
+    const groupId = senderTab.groupId;
+
+    if (groupId === undefined || groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      sendResponse({ success: false });
+      return;
+    }
+
+    // Check if sender tab is in a managed group
+    if (await TabGroupManager.findGroupByTab(senderTabId)) {
+      sendResponse({ success: true });
+      return;
+    }
+
+    // Get all tabs in the same group
+    const groupTabs = await chrome.tabs.query({ groupId: groupId });
+
+    // Check each other tab in the group for an active main tab
+    const checkTabForMainTab = async (index) => {
+      if (index >= groupTabs.length) {
+        sendResponse({ success: false });
+        return;
+      }
+
+      const candidateTab = groupTabs[index];
+
+      // Skip the sender tab and tabs without IDs
+      if (candidateTab.id === senderTabId || !candidateTab.id) {
+        await checkTabForMainTab(index + 1);
+        return;
+      }
+
+      const candidateTabId = candidateTab.id;
+      const now = Date.now();
+      const cached = mainTabAlivenessCache.get(candidateTabId);
+
+      // Use cached result if fresh (within 3 seconds)
+      if (cached && now - cached.timestamp < 3000) {
+        if (cached.isAlive) {
+          sendResponse({ success: true });
+        } else {
+          await checkTabForMainTab(index + 1);
+        }
+        return;
+      }
+
+      // Check if this tab is a main tab
+      chrome.runtime.sendMessage(
+        {
+          type: "MAIN_TAB_ACK_REQUEST",
+          secondaryTabId: senderTabId,
+          mainTabId: candidateTabId,
+          timestamp: now,
+        },
+        async (response) => {
+          const isAlive = response?.success ?? false;
+          mainTabAlivenessCache.set(candidateTabId, {
+            timestamp: now,
+            isAlive: isAlive,
+          });
+
+          if (isAlive) {
+            sendResponse({ success: true });
+          } else {
+            await checkTabForMainTab(index + 1);
+          }
+        }
+      );
+    };
+
+    await checkTabForMainTab(0);
+  } catch (error) {
+    sendResponse({ success: false });
+  }
+}
+
+/**
+ * Handle dismissing static indicators for a tab group
+ */
+async function handleDismissStaticIndicator(sender, sendResponse) {
+  const senderTabId = sender.tab?.id;
+
+  if (!senderTabId) {
+    sendResponse({ success: false });
+    return;
+  }
+
+  try {
+    const senderTab = await chrome.tabs.get(senderTabId);
+    const groupId = senderTab.groupId;
+
+    if (groupId === undefined || groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      sendResponse({ success: false });
+      return;
+    }
+
+    await TabGroupManager.initialize();
+    await TabGroupManager.dismissStaticIndicatorsForGroup(groupId);
+    sendResponse({ success: true });
+  } catch (error) {
+    sendResponse({ success: false });
+  }
+}
+
+// Tab removal handler
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  await TabGroupManager.handleTabClosed(tabId);
+});
+
+// Web navigation handler for extension URLs
+chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+  if (details.frameId === 0) {
+    await handleExtensionUrl(details.url, details.tabId);
+  }
+});
+
+// Alarm handler for scheduled tasks
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  // Handle prompt alarms
+  if (alarm.name.startsWith("prompt_")) {
+    try {
+      const alarmName = alarm.name;
+      const storage = await chrome.storage.local.get(["savedPrompts"]);
+      const prompts = storage.savedPrompts || [];
+      const prompt = prompts.find((p) => p.id === alarmName);
+
+      if (prompt) {
+        const runLogId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        let executionError = null;
+
+        try {
+          const task = {
+            id: prompt.id,
+            name: prompt.command || "Scheduled Task",
+            prompt: prompt.prompt,
+            url: prompt.url,
+            enabled: true,
+            skipPermissions: prompt.skipPermissions !== false,
+            model: prompt.model,
+          };
+          await executeScheduledTaskInNewWindow(task, runLogId);
+        } catch (error) {
+          executionError = error instanceof Error ? error : new Error(String(error));
+
+          try {
+            await chrome.notifications.create({
+              type: "basic",
+              iconUrl: "/icon-128.png",
+              title: "Scheduled Task Failed",
+              message: `Task "${prompt.command || "Scheduled Task"}" failed to execute. ${executionError.message}`,
+              priority: 2,
+            });
+          } catch (notificationError) {
+            // Ignore notification errors
+          }
+        }
+
+        // Schedule next occurrence for monthly/annually repeating tasks
+        if (prompt.repeatType === "monthly" || prompt.repeatType === "annually") {
+          try {
+            const { SavedPromptsService } = await dynamicImport(async () => {
+              const module = await import("./react-core.js");
+              return { SavedPromptsService: module.N.SavedPromptsService };
+            }, []);
+            await SavedPromptsService.updateAlarmForPrompt(prompt);
+          } catch (error) {
+            // Create retry alarm
+            const retryAlarmName = `retry_${alarmName}`;
+            try {
+              await chrome.alarms.create(retryAlarmName, { delayInMinutes: 1 });
+            } catch (alarmError) {
+              // Ignore alarm creation errors
+            }
+
+            try {
+              await chrome.notifications.create({
+                type: "basic",
+                iconUrl: "/icon-128.png",
+                title: "Scheduled Task Setup Failed",
+                message: `Failed to schedule next occurrence of "${prompt.command || "Scheduled Task"}". Please check the task settings.`,
+                priority: 2,
+              });
+            } catch (notificationError) {
+              // Ignore notification errors
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return;
+  }
+
+  // Handle retry alarms
+  if (alarm.name.startsWith("retry_")) {
+    try {
+      const originalAlarmName = alarm.name.replace("retry_", "");
+      const storage = await chrome.storage.local.get(["savedPrompts"]);
+      const prompts = storage.savedPrompts || [];
+      const prompt = prompts.find((p) => p.id === originalAlarmName);
+
+      if (prompt && (prompt.repeatType === "monthly" || prompt.repeatType === "annually")) {
+        try {
+          const { SavedPromptsService } = await dynamicImport(async () => {
+            const module = await import("./react-core.js");
+            return { SavedPromptsService: module.N.SavedPromptsService };
+          }, []);
+          await SavedPromptsService.updateAlarmForPrompt(prompt);
+        } catch (error) {
+          try {
+            await chrome.notifications.create({
+              type: "basic",
+              iconUrl: "/icon-128.png",
+              title: "Scheduled Task Needs Attention",
+              message: `Could not automatically reschedule "${prompt.command || "Scheduled Task"}". Please edit the task to reschedule it.`,
+              priority: 2,
+            });
+          } catch (notificationError) {
+            // Ignore notification errors
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+  }
+});
+
+// External message handler for OAuth and other cross-origin communication
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  (async () => {
+    const origin = sender.origin;
+
+    // Only accept messages from trusted origins
+    if (!origin || !["https://claude.ai"].includes(origin)) {
+      sendResponse({ success: false, error: "Untrusted origin" });
+      return;
+    }
+
+    // Handle OAuth redirect
+    if (message.type === "oauth_redirect") {
+      const result = await handleOAuthRedirect(message.redirect_uri, sender?.tab?.id);
+      sendResponse(result);
+      if (result.success) {
+        connectToNativeHost();
+      }
+      return;
+    }
+
+    // Handle ping
+    if (message.type === "ping") {
+      sendResponse({ success: true, exists: true });
+      return;
+    }
+
+    // Handle onboarding task
+    if (message.type === "onboarding_task") {
+      chrome.runtime.sendMessage({
+        type: "POPULATE_INPUT_TEXT",
+        prompt: message.payload?.prompt,
+      });
+      sendResponse({ success: true });
+      return;
+    }
+  })();
+
+  // Return true to indicate async response
+  return true;
+});

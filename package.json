@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "bun src/cli.ts",
+    "dev:browser": "bun --watch src/cli.ts browser serve --skip-permissions",
+    "dev:mac": "bun --watch src/cli.ts mac serve",
     "build": "tsc",
     "lint": "oxlint",
     "format": "oxfmt ."
@@ -19,7 +21,9 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",
+    "@types/express": "^5.0.6",
     "commander": "^14.0.3",
+    "express": "^5.2.1",
     "ws": "^8.19.0",
     "zod": "^3"
   },

@@ -184,10 +184,12 @@ browser
   .command("serve")
   .description("Start browser MCP server (connects to Chrome extension)")
   .option("--skip-permissions", "Bypass extension permission prompts for all domains")
+  .option("--api-key <key>", "Anthropic API key for find tool (or set ANTHROPIC_API_KEY)")
   .action(async (opts) => {
     const { startMcpServer } = await import("./mcp-server.js");
     await startMcpServer({
       skipPermissions: !!opts.skipPermissions,
+      anthropicApiKey: opts.apiKey,
     });
   });
 
@@ -346,9 +348,13 @@ mac
   .command("serve")
   .description("Start macOS desktop MCP server")
   .option("--no-notify", "Disable macOS notifications (enabled by default)")
+  .option("--api-key <key>", "Anthropic API key for find tool (or set ANTHROPIC_API_KEY)")
   .action(async (opts) => {
     const { startDesktopServer } = await import("./desktop-server.js");
-    await startDesktopServer({ notify: opts.notify !== false });
+    await startDesktopServer({
+      notify: opts.notify !== false,
+      anthropicApiKey: opts.apiKey,
+    });
   });
 
 // ---- mac status -----------------------------------------------------------

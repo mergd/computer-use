@@ -12,6 +12,7 @@ import { registerDesktopTools, checkPermissions, setNotificationsEnabled, cleanu
 
 export interface DesktopServerOptions {
   notify?: boolean;
+  anthropicApiKey?: string;
 }
 
 const RED = "\x1b[31m";

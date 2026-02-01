@@ -1,14 +1,14 @@
 {
   "mcpServers": {
     "computer-control-browser": {
-      "type": "stdio",
-      "command": "bun",
-      "args": ["src/cli.ts", "browser", "serve", "--skip-permissions"]
+      "type": "http",
+      "url": "http://127.0.0.1:62220/mcp"
     },
     "computer-control-mac": {
-      "type": "stdio",
+      "type": "stdio", 
       "command": "bun",
-      "args": ["src/cli.ts", "mac", "serve"]
+      "args": ["src/cli.ts", "mac", "serve"],
+      "cwd": "/Users/william/dev/browser-mcp"
     }
   }
 }

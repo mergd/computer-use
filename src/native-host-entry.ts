@@ -48,20 +48,36 @@ function startWebSocketProxy(port: number): void {
 
   const ws = new WebSocket(`ws://127.0.0.1:${port}`);
   let buffer = Buffer.alloc(0);
+  const pendingMessages: string[] = [];
 
   ws.on("open", () => {
     log("Connected to MCP server WebSocket");
+    // Send any messages that arrived before connection was ready
+    for (const msg of pendingMessages) {
+      log(`Sending buffered: ${msg}`);
+      ws.send(msg);
+    }
+    pendingMessages.length = 0;
   });
+
+  let retrying = false;
 
   ws.on("error", (err) => {
     log(`WebSocket error: ${err.message}`);
-    // Fall back to direct mode
-    startDirectMode();
+    retrying = true;
+    log("Retrying connection in 500ms...");
+    setTimeout(() => {
+      startWebSocketProxy(port);
+    }, 500);
   });
 
   ws.on("close", () => {
-    log("WebSocket closed, exiting");
-    process.exit(0);
+    if (retrying) {
+      log("WebSocket closed, waiting for retry...");
+    } else {
+      log("WebSocket closed, exiting");
+      process.exit(0);
+    }
   });
 
   // Chrome → WebSocket: read native messages from stdin, forward to WS
@@ -71,22 +87,32 @@ function startWebSocketProxy(port: number): void {
     let parsed: ReturnType<typeof decodeNativeMessage>;
     while ((parsed = decodeNativeMessage(buffer)) !== null) {
       buffer = Buffer.from(parsed.remaining);
-      // Forward to WebSocket as JSON
+      const msgStr = JSON.stringify(parsed.message);
+      log(`Chrome → WS: ${msgStr}`);
+      // Forward to WebSocket as JSON, or buffer if not connected yet
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(parsed.message));
+        ws.send(msgStr);
+      } else {
+        log(`WebSocket not ready, buffering message`);
+        pendingMessages.push(msgStr);
       }
     }
   });
 
   process.stdin.on("end", () => {
-    log("stdin closed, closing WebSocket");
+    log("stdin closed (Chrome terminated connection), closing WebSocket");
     ws.close();
+  });
+
+  process.stdin.on("error", (err) => {
+    log(`stdin error: ${err.message}`);
   });
 
   // WebSocket → Chrome: receive JSON from WS, send as native message to stdout
   ws.on("message", (data) => {
     try {
       const msg = JSON.parse(data.toString());
+      log(`WS → Chrome: ${JSON.stringify(msg)}`);
       process.stdout.write(encodeNativeMessage(msg));
     } catch (err) {
       log(`Failed to forward message to Chrome: ${err}`);
@@ -112,9 +138,8 @@ function startDirectMode(): void {
 // Entry Point
 // ---------------------------------------------------------------------------
 
-const port = readIpcPort();
-if (port) {
-  startWebSocketProxy(port);
-} else {
-  startDirectMode();
-}
+const DEFAULT_WS_PORT = 62222;
+
+// Try fixed port first, then fall back to port file
+const port = readIpcPort() ?? DEFAULT_WS_PORT;
+startWebSocketProxy(port);
