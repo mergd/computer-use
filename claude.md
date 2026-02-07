@@ -77,12 +77,14 @@ bun src/cli.ts browser serve --skip-permissions
 
 ## MCP Config (Claude Code / Cursor)
 
+Browser mode uses HTTP transport — run `computer-control browser serve` separately, then point clients at the URL.
+Mac mode uses stdio — clients spawn the process directly.
+
 ```json
 {
   "mcpServers": {
     "browser": {
-      "command": "computer-control",
-      "args": ["browser", "serve", "--skip-permissions"]
+      "url": "http://127.0.0.1:62220/mcp"
     },
     "mac": {
       "command": "computer-control",
