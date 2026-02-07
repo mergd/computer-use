@@ -6,14 +6,13 @@ MCP server for browser automation and macOS desktop control. Give your AI agent 
 
 ### Browser Mode
 
-Install the CLI and the [Chrome extension](https://chrome.google.com/webstore/detail/computer-control/kenhnnhgbbgkdbedfmijnllgpcognghl), then wire up the native messaging bridge:
+Install the CLI and the [Chrome extension](https://chromewebstore.google.com/detail/computer-control/kenhnnhgbbgkdbedfmijnllgpcognghl):
 
 ```bash
 npm i -g computer-control
-computer-control browser install
 ```
 
-The setup wizard walks you through connecting the extension. Once done, add it to your MCP config (Claude Code, Cursor, etc.):
+Add to your MCP config (Claude Code, Cursor, etc.). The native messaging bridge is registered automatically on first run:
 
 ```json
 {
@@ -92,9 +91,9 @@ Grant **Accessibility** and **Screen Recording** permissions to your terminal ap
 
 ```
 computer-control browser
-  install        Setup wizard (extension + native host)
+  serve          Start MCP server (auto-registers native host)
   status         Check installation
-  serve          Start MCP server
+  install        Re-register native host (or use custom extension ID)
   uninstall      Remove native host
 
 computer-control mac

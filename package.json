@@ -1,6 +1,6 @@
 {
   "name": "computer-control",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Computer control MCP server — browser automation via Chrome extension, macOS desktop control via native tools.",
   "type": "module",
   "bin": {

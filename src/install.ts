@@ -112,6 +112,13 @@ export function install(extensionId: string): { manifestPath: string; hostPath: 
   return { manifestPath: mp, hostPath };
 }
 
+/** Auto-register native host if not already done. */
+export function ensureInstalled(): void {
+  const mp = manifestPath();
+  if (fs.existsSync(mp)) return;
+  install(WEBSTORE_EXTENSION_ID);
+}
+
 /** Remove the native messaging host registration. */
 export function uninstall(): boolean {
   const mp = manifestPath();

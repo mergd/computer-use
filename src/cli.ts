@@ -14,7 +14,8 @@
 
 import { Command } from "commander";
 import readline from "node:readline";
-import { extensionDir, install, manifestPath, readExtensionId, uninstall } from "./install.js";
+import { WEBSTORE_EXTENSION_ID, install, ensureInstalled, manifestPath, readExtensionId, uninstall } from "./install.js";
+import { checkForUpdate } from "./update-check.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,10 +45,12 @@ function step(n: number, total: number, msg: string) {
 // Main Program
 // ---------------------------------------------------------------------------
 
+const VERSION = "0.1.1";
+
 const program = new Command()
   .name("computer-control")
   .description("Computer control MCP server — browser automation + macOS desktop control")
-  .version("0.1.0");
+  .version(VERSION);
 
 // ===========================================================================
 // BROWSER MODE
@@ -61,66 +64,34 @@ const browser = program
 
 browser
   .command("install")
-  .description("Interactive setup wizard for Chrome extension")
-  .option("--extension-id <id>", "Skip ID prompt (32 lowercase letters)")
+  .description("Register native messaging host for Chrome extension")
+  .option("--extension-id <id>", "Custom extension ID (defaults to Chrome Web Store ID)")
   .action(async (opts) => {
-    out(`
-${BOLD}${MAGENTA}computer-control browser setup${RESET}
-${DIM}Browser automation via Chrome extension${RESET}`);
+    const extensionId = opts.extensionId ?? WEBSTORE_EXTENSION_ID;
+
+    if (opts.extensionId && !/^[a-z]{32}$/.test(extensionId)) {
+      out(`${RED}Invalid extension ID.${RESET} Must be 32 lowercase letters.`);
+      process.exit(1);
+    }
 
     const existingId = readExtensionId();
     if (existingId) {
-      out(`\n${YELLOW}Existing install detected${RESET} ${DIM}(extension ${existingId})${RESET}`);
-      const ans = await ask("Reinstall? [y/N] ");
-      if (!ans.toLowerCase().startsWith("y")) { out("Aborted."); return; }
+      out(`${DIM}Updating existing registration (${existingId})${RESET}`);
     }
 
-    const total = 3;
-
-    // Step 1 — load extension
-    step(1, total, "Load the extension in Chrome");
-    out(`
-  1. Open ${CYAN}chrome://extensions${RESET}
-  2. Enable ${BOLD}Developer mode${RESET} (top-right toggle)
-  3. Click ${BOLD}Load unpacked${RESET}
-  4. Select this folder:
-
-     ${YELLOW}${extensionDir()}${RESET}
-`);
-    await ask(`${DIM}Press Enter when done…${RESET} `);
-
-    // Step 2 — extension ID
-    let extensionId: string = opts.extensionId ?? "";
-    if (!extensionId) {
-      step(2, total, "Enter the extension ID");
-      out(`
-  Chrome shows the extension with an ${BOLD}ID${RESET} — 32 lowercase letters.
-  ${DIM}Example: abcdefghijklmnopqrstuvwxyzabcdef${RESET}
-`);
-      while (!/^[a-z]{32}$/.test(extensionId)) {
-        extensionId = await ask(`${CYAN}Extension ID:${RESET} `);
-        if (!/^[a-z]{32}$/.test(extensionId)) out(`${RED}Invalid.${RESET} Must be 32 lowercase letters.`);
-      }
-    } else {
-      step(2, total, `Using provided ID: ${extensionId}`);
-    }
-
-    // Step 3 — register native host
-    step(3, total, "Registering native messaging host");
     const result = install(extensionId);
-    out(`${GREEN}✓${RESET} Host binary:  ${result.hostPath}`);
-    out(`${GREEN}✓${RESET} Manifest:     ${result.manifestPath}`);
 
-    // Done
-    out(`
-${GREEN}${BOLD}Done!${RESET}
+    out(`${GREEN}✓${RESET} Native host registered`);
+    out(`  ${DIM}${result.manifestPath}${RESET}`);
 
-${BOLD}Next:${RESET}
-  1. ${BOLD}Restart Chrome${RESET} (quit fully, then reopen)
-  2. Click the extension icon on any tab — badge shows ${GREEN}ON${RESET}
-  3. Run ${CYAN}computer-control browser serve${RESET} to start the MCP server
+    if (!existingId) {
+      out(`
+${BOLD}Next steps:${RESET}
+  1. Install the extension from the ${CYAN}Chrome Web Store${RESET}
+     https://chromewebstore.google.com/detail/computer-control/${WEBSTORE_EXTENSION_ID}
+  2. Restart Chrome
+  3. Add to your MCP config:
 
-${BOLD}Claude Code / Cursor MCP config:${RESET}
   ${DIM}{
     "mcpServers": {
       "browser": {
@@ -130,6 +101,7 @@ ${BOLD}Claude Code / Cursor MCP config:${RESET}
     }
   }${RESET}
 `);
+    }
   });
 
 // ---- browser status -------------------------------------------------------
@@ -141,10 +113,9 @@ browser
   .action(async (opts) => {
     const mp = manifestPath();
     const id = readExtensionId();
-    const extDir = extensionDir();
 
     if (opts.json) {
-      out(JSON.stringify({ extensionDir: extDir, manifestPath: mp, extensionId: id }, null, 2));
+      out(JSON.stringify({ manifestPath: mp, extensionId: id }, null, 2));
       return;
     }
 
@@ -156,6 +127,8 @@ browser
       out(`  ${DIM}${mp}${RESET}`);
     } else {
       out(`${RED}✗${RESET} Native host not registered`);
+      out(`\nRun: ${CYAN}computer-control browser install${RESET}`);
+      return;
     }
 
     if (id) {
@@ -163,20 +136,7 @@ browser
     } else {
       out(`${YELLOW}?${RESET} Extension ID unknown`);
     }
-
-    out(`\n${DIM}Extension source: ${extDir}${RESET}`);
-
-    if (!fs.existsSync(mp)) {
-      out(`\nRun: ${CYAN}computer-control browser install${RESET}`);
-    }
   });
-
-// ---- browser path ---------------------------------------------------------
-
-browser
-  .command("path")
-  .description("Print extension directory (for Load unpacked)")
-  .action(() => out(extensionDir()));
 
 // ---- browser serve --------------------------------------------------------
 
@@ -186,6 +146,8 @@ browser
   .option("--skip-permissions", "Bypass extension permission prompts for all domains")
   .option("--api-key <key>", "Anthropic API key for find tool (or set ANTHROPIC_API_KEY)")
   .action(async (opts) => {
+    checkForUpdate(VERSION);
+    ensureInstalled();
     const { startMcpServer } = await import("./mcp-server.js");
     await startMcpServer({
       skipPermissions: !!opts.skipPermissions,
@@ -350,6 +312,7 @@ mac
   .option("--no-notify", "Disable macOS notifications (enabled by default)")
   .option("--api-key <key>", "Anthropic API key for find tool (or set ANTHROPIC_API_KEY)")
   .action(async (opts) => {
+    checkForUpdate(VERSION);
     const { startDesktopServer } = await import("./desktop-server.js");
     await startDesktopServer({
       notify: opts.notify !== false,
