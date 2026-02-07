@@ -15,7 +15,7 @@
 import { Command } from "commander";
 import readline from "node:readline";
 import { WEBSTORE_EXTENSION_ID, install, ensureInstalled, manifestPath, readExtensionId, uninstall } from "./install.js";
-import { checkForUpdate } from "./update-check.js";
+import { checkForUpdate, printVersion } from "./update-check.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -379,5 +379,10 @@ mac
       out(`\n${GREEN}✓${RESET} All permissions granted for ${BOLD}${terminal}${RESET}`);
     }
   });
+
+if (process.argv.includes("--version") || process.argv.includes("-V")) {
+  await printVersion(VERSION);
+  process.exit(0);
+}
 
 program.parse();

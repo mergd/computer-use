@@ -6,6 +6,12 @@ const PKG_NAME = "computer-control";
 const CACHE_FILE = path.join(os.homedir(), ".browser-mcp", "update-check.json");
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
+const RESET = "\x1b[0m";
+const DIM = "\x1b[2m";
+const GREEN = "\x1b[32m";
+const YELLOW = "\x1b[33m";
+const CYAN = "\x1b[36m";
+
 interface CacheData {
   latest: string;
   checkedAt: number;
@@ -37,37 +43,72 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-export function checkForUpdate(currentVersion: string): void {
-  const cache = readCache();
-
-  if (cache && Date.now() - cache.checkedAt < CHECK_INTERVAL_MS) {
-    if (compareVersions(cache.latest, currentVersion) > 0) {
-      printNotice(currentVersion, cache.latest);
-    }
-    return;
+async function fetchLatest(): Promise<string | null> {
+  try {
+    const r = await fetch(`https://registry.npmjs.org/${PKG_NAME}/latest`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    const data: any = await r.json();
+    const latest = data.version;
+    if (latest) writeCache({ latest, checkedAt: Date.now() });
+    return latest ?? null;
+  } catch {
+    return null;
   }
-
-  fetch(`https://registry.npmjs.org/${PKG_NAME}/latest`, {
-    signal: AbortSignal.timeout(3000),
-  })
-    .then((r) => r.json())
-    .then((data: any) => {
-      const latest = data.version;
-      if (!latest) return;
-      writeCache({ latest, checkedAt: Date.now() });
-      if (compareVersions(latest, currentVersion) > 0) {
-        printNotice(currentVersion, latest);
-      }
-    })
-    .catch(() => {});
 }
 
-function printNotice(current: string, latest: string): void {
-  const DIM = "\x1b[2m";
-  const YELLOW = "\x1b[33m";
-  const CYAN = "\x1b[36m";
-  const RESET = "\x1b[0m";
+function hasUpdate(latest: string | null, current: string): boolean {
+  return !!latest && compareVersions(latest, current) > 0;
+}
+
+function printUpdateNotice(current: string, latest: string): void {
   process.stderr.write(
-    `${DIM}Update available: ${current} → ${YELLOW}${latest}${RESET}${DIM}  Run ${CYAN}npm i -g ${PKG_NAME}${RESET}${DIM} to update${RESET}\n`
+    `${DIM}Update available: ${current} → ${YELLOW}${latest}${RESET}${DIM}  Run ${CYAN}npm i -g ${PKG_NAME}${RESET}${DIM} to update${RESET}\n`,
   );
+}
+
+/**
+ * For `serve` commands — prints version line, fires background update check.
+ */
+export function checkForUpdate(currentVersion: string): void {
+  const cache = readCache();
+  const isFresh = cache && Date.now() - cache.checkedAt < CHECK_INTERVAL_MS;
+  const cachedLatest = isFresh ? cache.latest : null;
+
+  if (cachedLatest && hasUpdate(cachedLatest, currentVersion)) {
+    process.stderr.write(`${DIM}computer-control v${currentVersion}${RESET}\n`);
+    printUpdateNotice(currentVersion, cachedLatest);
+  } else if (cachedLatest) {
+    process.stderr.write(`${DIM}computer-control v${currentVersion} ${GREEN}✓ latest${RESET}\n`);
+  } else {
+    process.stderr.write(`${DIM}computer-control v${currentVersion}${RESET}\n`);
+  }
+
+  if (!isFresh) {
+    fetchLatest()
+      .then((latest) => {
+        if (hasUpdate(latest, currentVersion)) {
+          printUpdateNotice(currentVersion, latest!);
+        }
+      })
+      .catch(() => {});
+  }
+}
+
+/**
+ * For `--version` — async, waits for fetch result to show latest status.
+ */
+export async function printVersion(currentVersion: string): Promise<void> {
+  const cache = readCache();
+  const isFresh = cache && Date.now() - cache.checkedAt < CHECK_INTERVAL_MS;
+  const latest = isFresh ? cache!.latest : await fetchLatest();
+
+  if (hasUpdate(latest, currentVersion)) {
+    process.stdout.write(`${currentVersion}\n`);
+    printUpdateNotice(currentVersion, latest!);
+  } else if (latest) {
+    process.stdout.write(`${currentVersion} ${GREEN}✓ latest${RESET}\n`);
+  } else {
+    process.stdout.write(`${currentVersion}\n`);
+  }
 }
