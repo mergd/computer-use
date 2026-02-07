@@ -216,7 +216,6 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   if (options.skipPermissions) {
     log("Permission bypass enabled — all domains auto-approved");
   }
-  log("Waiting for connections...");
-  log(`  - Claude Code: http://127.0.0.1:${HTTP_PORT}/mcp`);
-  log(`  - Extension: WebSocket on port ${WS_PORT}`);
+  log(`MCP endpoint: http://127.0.0.1:${HTTP_PORT}/mcp`);
+  log("Waiting for Chrome extension connection...");
 }

@@ -12,14 +12,19 @@ Install the CLI and the [Chrome extension](https://chromewebstore.google.com/det
 npm i -g computer-control
 ```
 
-Add to your MCP config (Claude Code, Cursor, etc.). The native messaging bridge is registered automatically on first run:
+Start the server (native messaging bridge is registered automatically on first run):
+
+```bash
+computer-control browser serve
+```
+
+Then add the MCP endpoint to your AI client (Claude Code, Cursor, etc.):
 
 ```json
 {
   "mcpServers": {
     "browser": {
-      "command": "computer-control",
-      "args": ["browser", "serve", "--skip-permissions"]
+      "url": "http://127.0.0.1:62220/mcp"
     }
   }
 }

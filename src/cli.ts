@@ -90,14 +90,12 @@ ${BOLD}Next steps:${RESET}
   1. Install the extension from the ${CYAN}Chrome Web Store${RESET}
      https://chromewebstore.google.com/detail/computer-control/${WEBSTORE_EXTENSION_ID}
   2. Restart Chrome
-  3. Add to your MCP config:
+  3. Run ${CYAN}computer-control browser serve${RESET}
+  4. Add the MCP endpoint to your AI client:
 
   ${DIM}{
     "mcpServers": {
-      "browser": {
-        "command": "computer-control",
-        "args": ["browser", "serve"]
-      }
+      "browser": { "url": "http://127.0.0.1:62220/mcp" }
     }
   }${RESET}
 `);
