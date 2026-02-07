@@ -1,111 +1,47 @@
 # Computer Control
 
-Browser automation and macOS desktop control for AI agents via the Model Context Protocol (MCP).
+MCP server for browser automation and macOS desktop control. Give your AI agent eyes and hands.
 
-## Features
+## Getting Started
 
-**Browser Mode** (Chrome Extension)
-- Take screenshots of web pages
-- Click, type, scroll, and navigate
-- Read page content and accessibility trees
-- Execute JavaScript in page context
-- Record and export GIF recordings
-- Manage tabs and windows
+### Browser Mode
 
-**Mac Mode** (Native macOS)
-- Control mouse and keyboard
-- Take screenshots and OCR
-- Read accessibility trees
-- Execute AppleScript
-- Record GIF screen captures
-
-## Quick Start
-
-### Option 1: Install from Chrome Web Store (Recommended)
-
-1. **Install the extension** from the [Chrome Web Store](https://chrome.google.com/webstore/detail/computer-control/kenhnnhgbbgkdbedfmijnllgpcognghl)
-
-2. **Install the CLI**
-   ```bash
-   npm install -g computer-control
-   # or
-   bun install -g computer-control
-   ```
-
-3. **Run the setup wizard**
-   ```bash
-   computer-control browser install
-   ```
-   When prompted for the extension ID, enter: `kenhnnhgbbgkdbedfmijnllgpcognghl`
-
-4. **Add to your MCP config** (Claude Code, Cursor, etc.)
-   ```json
-   {
-     "mcpServers": {
-       "computer-control-browser": {
-         "command": "computer-control",
-         "args": ["browser", "serve", "--skip-permissions"]
-       }
-     }
-   }
-   ```
-
-5. **Restart your AI assistant** and start automating!
-
-### Option 2: Load Extension from Source
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/mergd/computer-use.git
-   cd computer-use
-   bun install
-   bun run build
-   ```
-
-2. **Build the extension**
-   ```bash
-   cd extension && ./build.sh
-   ```
-
-3. **Load in Chrome**
-   - Open `chrome://extensions`
-   - Enable "Developer mode"
-   - Click "Load unpacked"
-   - Select the `extension/dist` folder
-   - Copy the extension ID (32 lowercase letters)
-
-4. **Run the setup wizard**
-   ```bash
-   computer-control browser install --extension-id YOUR_EXTENSION_ID
-   ```
-
-5. **Add to MCP config** (same as above)
-
-## Mac Mode Setup
-
-For native macOS control (no browser needed):
+Install the CLI and the [Chrome extension](https://chrome.google.com/webstore/detail/computer-control/kenhnnhgbbgkdbedfmijnllgpcognghl), then wire up the native messaging bridge:
 
 ```bash
-# Run the setup wizard
-computer-control mac setup
-
-# Check status
-computer-control mac status
+npm i -g computer-control
+computer-control browser install
 ```
 
-**Requirements:**
-- `cliclick` for mouse/keyboard: `brew install cliclick`
-- `gifsicle` for GIF recording: `brew install gifsicle`
+The setup wizard walks you through connecting the extension. Once done, add it to your MCP config (Claude Code, Cursor, etc.):
 
-**macOS Permissions** (grant to your terminal app):
-- Accessibility (System Settings → Privacy & Security → Accessibility)
-- Screen Recording (System Settings → Privacy & Security → Screen Recording)
-
-**MCP Config:**
 ```json
 {
   "mcpServers": {
-    "computer-control-mac": {
+    "browser": {
+      "command": "computer-control",
+      "args": ["browser", "serve", "--skip-permissions"]
+    }
+  }
+}
+```
+
+### Mac Mode
+
+Native macOS control — no browser needed. Install deps, run the wizard, and you're set:
+
+```bash
+brew install cliclick gifsicle
+npm i -g computer-control
+computer-control mac setup
+```
+
+Grant **Accessibility** and **Screen Recording** permissions to your terminal app when prompted.
+
+```json
+{
+  "mcpServers": {
+    "mac": {
       "command": "computer-control",
       "args": ["mac", "serve"]
     }
@@ -113,42 +49,26 @@ computer-control mac status
 }
 ```
 
-## CLI Commands
+## Tools
 
-```
-computer-control browser
-├── install       Interactive setup wizard
-├── status        Check installation status
-├── serve         Start MCP server
-├── path          Print extension directory
-└── uninstall     Remove native host
-
-computer-control mac
-├── setup         Interactive setup wizard
-├── status        Check dependencies & permissions
-└── serve         Start MCP server
-```
-
-## Available Tools
-
-### Browser Mode
+### Browser
 
 | Tool | Description |
 |------|-------------|
-| `read_page` | Get accessibility tree of page elements |
-| `find` | Find elements by natural language query |
-| `computer` | Mouse/keyboard actions and screenshots |
-| `navigate` | Navigate to URL or go back/forward |
+| `computer` | Mouse, keyboard, and screenshots |
+| `read_page` | Accessibility tree of page elements |
+| `find` | Find elements by natural language |
+| `navigate` | Go to URL, back, forward |
 | `form_input` | Set form input values |
-| `javascript_tool` | Execute JavaScript in page context |
-| `get_page_text` | Extract raw text content from page |
-| `tabs_context` | Get tab group context info |
-| `tabs_create` | Create new tab in MCP group |
+| `javascript_tool` | Execute JS in page context |
+| `get_page_text` | Extract raw text content |
+| `tabs_context` | Tab group context |
+| `tabs_create` | Open new tab |
 | `resize_window` | Resize browser window |
-| `gif_creator` | Record and export GIF of browser actions |
-| `upload_image` | Upload image to file input or drag target |
+| `gif_creator` | Record browser actions as GIF |
+| `upload_image` | Upload image to file input |
 
-### Mac Mode
+### Mac
 
 | Tool | Description |
 |------|-------------|
@@ -156,66 +76,66 @@ computer-control mac
 | `mouse_click` | Click at coordinates |
 | `mouse_move` | Move cursor |
 | `mouse_scroll` | Scroll in direction |
-| `mouse_drag` | Drag from one point to another |
+| `mouse_drag` | Drag between points |
 | `type_text` | Type text at cursor |
 | `key_press` | Press key with modifiers |
 | `run_applescript` | Execute AppleScript |
-| `get_active_window` | Get focused window info |
+| `get_active_window` | Focused window info |
 | `list_windows` | List open windows |
 | `focus_app` | Bring app to foreground |
-| `get_accessibility_tree` | Get UI element hierarchy |
+| `get_accessibility_tree` | UI element hierarchy |
 | `ocr_screen` | Extract text via OCR |
 | `find` | Find elements by natural language |
-| `gif_start/stop/export` | Record screen as GIF |
+| `gif_start` / `gif_stop` / `gif_export` | Record screen as GIF |
+
+## CLI Reference
+
+```
+computer-control browser
+  install        Setup wizard (extension + native host)
+  status         Check installation
+  serve          Start MCP server
+  uninstall      Remove native host
+
+computer-control mac
+  setup          Setup wizard (deps + permissions)
+  status         Check deps & permissions
+  serve          Start MCP server
+```
 
 ## Troubleshooting
 
-### Extension not connecting
+**Extension not connecting?**
+Run `computer-control browser status` to check the native host registration. Make sure Chrome is running and the extension is enabled. Restart Chrome if needed.
 
-1. Check the extension is enabled in `chrome://extensions`
-2. Verify the native host is registered:
-   ```bash
-   computer-control browser status
-   ```
-3. Make sure Chrome is running
-4. Try restarting Chrome
+**Permission errors on Mac?**
+Add your terminal app to Accessibility and Screen Recording in System Settings → Privacy & Security. Restart the terminal after.
 
-### Permission errors on Mac
-
-Grant permissions to your terminal app in System Settings:
-- Privacy & Security → Accessibility
-- Privacy & Security → Screen Recording
-
-Then restart your terminal.
-
-### MCP server not starting
-
-Check if the port is already in use:
+**Port conflict?**
 ```bash
-lsof -i :62222  # Browser mode WebSocket port
-lsof -i :62220  # Browser mode HTTP port
+lsof -i :62222  # WebSocket port
+lsof -i :62220  # HTTP port
 ```
 
 ## Development
 
 ```bash
-# Install dependencies
+git clone https://github.com/mergd/computer-use.git
+cd computer-use
 bun install
-
-# Build everything
 bun run build
-
-# Build extension only
-cd extension && ./build.sh
 
 # Run from source
 bun src/cli.ts browser serve --skip-permissions
 bun src/cli.ts mac serve
+
+# Build extension from source
+cd extension && ./build.sh
 ```
 
 ## Privacy
 
-See [PRIVACY.md](PRIVACY.md) for our privacy policy.
+See [PRIVACY.md](PRIVACY.md).
 
 ## License
 
