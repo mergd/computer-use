@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,7 +39,8 @@ export function manifestPath(): string {
 }
 
 export function hostBinaryPath(): string {
-  return path.join(stateDir(), "native-host");
+  const ext = process.platform === "win32" ? ".bat" : "";
+  return path.join(stateDir(), `native-host${ext}`);
 }
 
 /** Read the extension ID from an existing native host manifest. */
@@ -54,22 +56,48 @@ export function readExtensionId(): string | null {
   }
 }
 
-/** Create the shell wrapper that Chrome will exec as the native host. */
+/** Resolve the full path to a binary so Chrome's minimal PATH can find it. */
+function resolveRuntime(name: string): string {
+  const cmd = process.platform === "win32" ? `where ${name}` : `which ${name}`;
+  try {
+    const result = execSync(cmd, { encoding: "utf-8" }).trim();
+    return result.split("\n")[0];
+  } catch {
+    return name;
+  }
+}
+
+/** Create the wrapper script that Chrome will exec as the native host. */
 function writeHostBinary(): string {
   const target = hostBinaryPath();
   fs.mkdirSync(path.dirname(target), { recursive: true });
 
-  // Point at the compiled JS entry or TS source depending on what exists.
   const distEntry = path.resolve(__dirname, "native-host-entry.js");
   const srcEntry = path.resolve(__dirname, "native-host-entry.ts");
 
+  if (process.platform === "win32") {
+    let cmd: string;
+    if (fs.existsSync(distEntry)) {
+      const nodePath = resolveRuntime("node");
+      cmd = `@"${nodePath}" "${distEntry}" %*`;
+    } else {
+      const npxPath = resolveRuntime("npx");
+      cmd = `@"${npxPath}" tsx "${srcEntry}" %*`;
+    }
+    fs.writeFileSync(target, `@echo off\r\n${cmd}\r\n`);
+    return target;
+  }
+
   let exec: string;
   if (fs.existsSync(distEntry)) {
-    exec = `exec node "${distEntry}" "$@"`;
+    const nodePath = resolveRuntime("node");
+    exec = `exec "${nodePath}" "${distEntry}" "$@"`;
   } else if (process.versions.bun) {
-    exec = `exec bun "${srcEntry}" "$@"`;
+    const bunPath = resolveRuntime("bun");
+    exec = `exec "${bunPath}" "${srcEntry}" "$@"`;
   } else {
-    exec = `exec npx tsx "${srcEntry}" "$@"`;
+    const npxPath = resolveRuntime("npx");
+    exec = `exec "${npxPath}" tsx "${srcEntry}" "$@"`;
   }
 
   const script = `#!/bin/sh
