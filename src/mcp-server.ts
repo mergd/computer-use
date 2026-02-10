@@ -8,7 +8,6 @@
  * extension's native host connects via WebSocket.
  */
 
-import fs from "node:fs";
 import { WebSocketServer, WebSocket } from "ws";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -186,25 +185,43 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   const app = express();
   app.use(express.json());
 
-  // Single persistent MCP server instance (stateless mode)
-  const mcpServer = new McpServer({
-    name: "browser-mcp",
-    version: "0.1.0",
-  });
-  registerBrowserTools(mcpServer, execTool, {
-    anthropicApiKey: options.anthropicApiKey,
-  });
+  const transports = new Map<string, StreamableHTTPServerTransport>();
 
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // Stateless - no sessions
-  });
+  function createSession(): { server: McpServer; transport: StreamableHTTPServerTransport } {
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    });
 
-  await mcpServer.connect(transport);
+    const server = new McpServer({ name: "browser-mcp", version: "0.1.0" });
+    registerBrowserTools(server, execTool, { anthropicApiKey: options.anthropicApiKey });
+
+    transport.onclose = () => {
+      const sid = transport.sessionId;
+      if (sid) transports.delete(sid);
+    };
+
+    return { server, transport };
+  }
+
   log("MCP server initialized");
 
-  // Single /mcp endpoint
   app.all("/mcp", async (req, res) => {
-    await transport.handleRequest(req, res, req.body);
+    const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+    if (sessionId && transports.has(sessionId)) {
+      await transports.get(sessionId)!.handleRequest(req, res, req.body);
+      return;
+    }
+
+    if (req.method === "POST" && !sessionId) {
+      const { server, transport } = createSession();
+      await server.connect(transport);
+      transports.set(transport.sessionId!, transport);
+      await transport.handleRequest(req, res, req.body);
+      return;
+    }
+
+    res.status(400).json({ error: "Bad request — missing or invalid session" });
   });
 
   // Start HTTP server
